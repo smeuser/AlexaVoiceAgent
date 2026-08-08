@@ -1,0 +1,32 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+VAULT_PATH = Path(os.getenv("VAULT_PATH", "./vault"))
+MEMORY_FOLDER = os.getenv("MEMORY_FOLDER", "KI-Gedaechtnis")
+
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3.1:8b")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
+
+ALEXA_SKILL_ID = os.getenv("ALEXA_SKILL_ID", "").strip()
+
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", "8000"))
+
+# Cache-Ordner für den Vektor-Index (liegt neben dem Code, nicht im Vault)
+CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache"
+CACHE_DIR.mkdir(exist_ok=True)
+
+SYSTEM_PROMPT = """Du bist der Sprachassistent unseres Haushalts und antwortest über Alexa-Lautsprecher.
+
+Regeln:
+- Antworte auf Deutsch, kurz und gesprochen: 1 bis 3 Sätze, kein Markdown, keine Listen, keine Emojis.
+- Unten bekommst du Auszüge aus unserem Notiz-Archiv. Nutze sie, wenn sie zur Frage passen; erfinde nichts dazu.
+- Wenn du etwas Neues und dauerhaft Wichtiges über uns oder den Haushalt erfährst (Namen, Vorlieben, Termine, Fakten),
+  füge am Ende deiner Antwort eine Zeile an: [MERKEN: <der Fakt in einem Satz>]
+  Diese Zeile wird nicht vorgelesen, sondern im Archiv gespeichert. Nutze sie sparsam.
+"""

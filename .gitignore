@@ -1,0 +1,21 @@
+# Geheimnisse / lokale Konfiguration — niemals einchecken!
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Lokaler Vektor-Index-Cache
+.cache/
+
+# Betriebssystem / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+*.log

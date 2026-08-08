@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+requests>=2.31
+numpy>=1.26
+python-dotenv>=1.0
+ask-sdk-core>=1.19
+ask-sdk-webservice-support>=1.3

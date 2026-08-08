@@ -1,2 +1,143 @@
 # AlexaVoiceAgent
+
 A language model hosted on a local windows server with a 8gb vram machine. the language model should get a memory with obsidian and then we want to attach this language model with Alexa through a self made Alexa skill.
+
+Ein lokales Sprachmodell auf deinem Windows-PC, mit Gedächtnis in einem Obsidian-Vault,
+erreichbar über die Alexa Echos im Haushalt.
+
+```
+Echo ──► Alexa Cloud ──► Cloudflare Tunnel ──► FastAPI-Server (dieser Code)
+                                                   ├─► Ollama (Sprachmodell, lokal)
+                                                   └─► Obsidian-Vault (Gedächtnis, lesen + schreiben)
+```
+
+**So fühlt es sich an:** „Alexa, öffne mein gehirn“ → danach kannst du frei Fragen stellen.
+Das Modell nutzt deine Obsidian-Notizen als Wissen und legt neue Fakten selbstständig unter
+`KI-Gedaechtnis/` im Vault ab – dort kannst du sie in Obsidian ansehen und bearbeiten.
+
+> **Wichtig zu wissen:** Alexa selbst lässt sich nicht ersetzen. Das Modell lebt hinter einem
+> sogenannten Skill mit eigenem Aufrufnamen („mein gehirn“, änderbar). Außerdem wartet Alexa
+> maximal ca. 8 Sekunden auf eine Antwort – deshalb halten wir Antworten kurz und das Modell
+> dauerhaft im Grafikspeicher.
+
+---
+
+## 1. Ollama und Modelle installieren (Windows)
+
+1. [Ollama für Windows](https://ollama.com/download) herunterladen und installieren.
+2. In der Eingabeaufforderung (cmd) die Modelle laden:
+
+```bash
+ollama pull llama3.1:8b
+```
+
+```bash
+ollama pull nomic-embed-text
+```
+
+`llama3.1:8b` (ca. 4,9 GB) passt gut in 6–8 GB VRAM und spricht ordentlich Deutsch.
+Alternative zum Ausprobieren: `qwen3:8b`. Das Modell trägst du in der `.env` ein.
+`nomic-embed-text` ist das kleine Embedding-Modell für die Notiz-Suche.
+
+Kurztest: `ollama run llama3.1:8b` und etwas auf Deutsch fragen (mit `/bye` beenden).
+
+## 2. Diesen Server einrichten
+
+Voraussetzung: [Python 3.11+](https://www.python.org/downloads/) (beim Installieren „Add to PATH“ anhaken).
+
+Im Projektordner:
+
+```bash
+python -m venv .venv
+```
+
+```bash
+.venv\Scripts\activate && pip install -r requirements.txt
+```
+
+Dann `.env.example` nach `.env` kopieren und anpassen – vor allem `VAULT_PATH`
+(der Ordner deines Obsidian-Vaults). Falls du noch keinen Vault hast: einfach in
+Obsidian einen neuen anlegen und den Pfad eintragen.
+
+Server starten:
+
+```bash
+uvicorn server.main:app --host 0.0.0.0 --port 8000
+```
+
+Beim ersten Start werden die Modelle geladen und der Vault indexiert (kann je nach
+Notizmenge etwas dauern). Testen ohne Alexa:
+
+```bash
+curl -X POST http://localhost:8000/chat -H "Content-Type: application/json" -d "{\"frage\": \"Hallo! Was weisst du ueber uns?\"}"
+```
+
+## 3. Cloudflare Tunnel (macht den Server für Alexa erreichbar)
+
+Der Alexa-Skill läuft in Amazons Cloud und braucht eine öffentliche HTTPS-Adresse.
+Der Tunnel stellt sie bereit, ohne dass du Ports im Router öffnen musst.
+
+1. Kostenloses Konto auf [cloudflare.com](https://dash.cloudflare.com) anlegen.
+2. Eine eigene Domain bei Cloudflare registrieren (ab ca. 5 €/Jahr) oder eine vorhandene
+   Domain zu Cloudflare umziehen.
+3. Im Cloudflare-Dashboard: **Zero Trust → Networks → Tunnels → Create a tunnel** („Cloudflared“).
+4. Den angezeigten Windows-Installationsbefehl auf deinem PC ausführen – er installiert
+   `cloudflared` als Windows-Dienst (startet damit automatisch mit dem PC).
+5. Im Tunnel einen **Public Hostname** anlegen, z.B.
+   `alexa.deine-domain.de` → Service `http://localhost:8000`.
+
+Test im Browser (auch vom Handy aus dem Mobilfunknetz): `https://alexa.deine-domain.de/health`
+sollte `{"status":"ok"}` zeigen.
+
+## 4. Alexa-Skill anlegen
+
+1. Auf [developer.amazon.com/alexa](https://developer.amazon.com/alexa/console/ask) mit
+   **demselben Amazon-Konto anmelden, das auf deinen Echos eingerichtet ist** – dann ist der
+   Skill automatisch auf allen deinen Geräten verfügbar, ohne Veröffentlichung.
+2. **Create Skill**: Name z.B. „Hausgehirn“, Sprache **Deutsch (DE)**, Typ **Custom**,
+   Hosting **Provision your own**.
+3. Links **Interaction Model → JSON Editor** öffnen und den Inhalt von
+   [skill/interaction-model-de-DE.json](skill/interaction-model-de-DE.json) einfügen.
+   (Den Aufrufnamen „mein gehirn“ kannst du dort ändern – er muss aus mindestens zwei
+   Wörtern bestehen und darf nicht „Alexa“, „Echo“ o.ä. enthalten.) Dann **Save** und **Build Model**.
+4. Links **Endpoint**: **HTTPS** auswählen, als Default Region deine Tunnel-Adresse eintragen:
+   `https://alexa.deine-domain.de/alexa`
+   Als Zertifikatstyp: **„My development endpoint has a certificate from a trusted certificate
+   authority“** (Cloudflare liefert ein gültiges Zertifikat).
+5. Oben auf der Endpoint-Seite steht **Your Skill ID** (`amzn1.ask.skill....`) – diese in die
+   `.env` als `ALEXA_SKILL_ID` eintragen und den Server neu starten.
+6. Im Tab **Test** den Skill-Test auf **Development** stellen. Dort kannst du erst per Text
+   testen: „öffne mein gehirn“.
+
+Dann am Echo: **„Alexa, öffne mein gehirn“** – und losfragen. Innerhalb der Sitzung kannst du
+direkt weitersprechen; mit „Stopp“ beendest du sie.
+
+## 5. Autostart (optional, empfohlen)
+
+Damit alles nach einem Neustart des PCs von selbst läuft:
+
+- **Ollama** und **cloudflared** starten als Dienste automatisch.
+- Den FastAPI-Server über die **Aufgabenplanung** (Task Scheduler) starten:
+  Neue Aufgabe → Trigger „Bei Anmeldung“ → Aktion: Programm
+  `C:\Pfad\zum\Projekt\.venv\Scripts\uvicorn.exe` mit Argumenten
+  `server.main:app --host 0.0.0.0 --port 8000` und „Starten in“ = Projektordner.
+
+## Wie das Gedächtnis funktioniert
+
+- **Lesen:** Vor jeder Antwort durchsucht der Server deinen Vault (semantische Suche über
+  Embeddings) und gibt dem Modell die passendsten Notiz-Abschnitte mit. Geänderte Notizen
+  werden automatisch neu indexiert.
+- **Schreiben/Lernen:** Erkennt das Modell einen dauerhaft wichtigen Fakt (oder sagst du
+  „merke dir …“), legt es ihn als Zeile in `KI-Gedaechtnis/JJJJ-MM.md` im Vault ab. Beim
+  nächsten Gespräch wird diese Notiz mit durchsucht – so „lernt“ das System.
+- Du kannst das Gedächtnis jederzeit in Obsidian öffnen, korrigieren oder löschen.
+
+## Wenn etwas hakt
+
+- **Alexa sagt „…antwortet nicht“:** Meist ein Timeout. Prüfe, ob `/health` über die
+  Tunnel-Adresse erreichbar ist und ob die erste Antwort im `/chat`-Test unter ~6 Sekunden
+  liegt. Das Warmup beim Serverstart muss durchgelaufen sein.
+- **Signaturfehler im Server-Log:** Die Anfrage kam nicht von Amazon oder die Skill-ID in
+  der `.env` stimmt nicht mit der Konsole überein.
+- **Antworten sind langsam:** Kleineres Modell probieren (z.B. `llama3.2:3b`) oder prüfen,
+  ob Ollama wirklich die GPU nutzt (`ollama ps` zeigt „100% GPU“).

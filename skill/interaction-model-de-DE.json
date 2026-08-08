@@ -1,0 +1,39 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "mein gehirn",
+      "intents": [
+        {
+          "name": "ChatIntent",
+          "slots": [
+            {
+              "name": "frage",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "frage {frage}",
+            "sag mir {frage}",
+            "erzähl mir {frage}",
+            "ich möchte wissen {frage}",
+            "was {frage}",
+            "wie {frage}",
+            "wer {frage}",
+            "wann {frage}",
+            "warum {frage}",
+            "wo {frage}",
+            "ob {frage}",
+            "merke dir {frage}",
+            "notiere {frage}"
+          ]
+        },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] }
+      ],
+      "types": []
+    }
+  }
+}
