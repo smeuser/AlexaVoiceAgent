@@ -112,6 +112,31 @@ sollte `{"status":"ok"}` zeigen.
 Dann am Echo: **„Alexa, öffne mein gehirn“** – und losfragen. Innerhalb der Sitzung kannst du
 direkt weitersprechen; mit „Stopp“ beendest du sie.
 
+## Plan B: Alexa-hosted Skill als Vermittler (Relay)
+
+Falls Amazon selbst gehostete HTTPS-Endpoints auf deinem Konto nicht aufruft
+(bekanntes Kontoproblem, Symptom: „Ich kann den angeforderten Skill nicht erreichen“,
+obwohl der Endpoint nachweislich erreichbar ist), gibt es einen robusten Umweg:
+Der Skill läuft als **Alexa-hosted Skill** in Amazons Cloud und besteht nur aus einem
+winzigen Vermittler ([skill/lambda_relay.py](skill/lambda_relay.py)), der jede Anfrage
+durch den Cloudflare Tunnel an deinen Server weiterreicht (Endpoint `/relay`).
+
+Einrichtung:
+
+1. Langes Zufalls-Token erzeugen und in der `.env` als `RELAY_TOKEN` eintragen,
+   Server neu starten.
+2. In der Developer Console einen Skill anlegen: **Custom** + Hosting
+   **Alexa-hosted (Python)** + Template **Start from Scratch**.
+3. **Interaction Model → JSON Editor**: Inhalt von
+   [skill/interaction-model-de-DE.json](skill/interaction-model-de-DE.json) einfügen
+   → Save → Build. (Achtung: Der Aufrufname darf nicht gleichzeitig in einem zweiten
+   Skill verwendet werden.)
+4. Reiter **Code**: Inhalt von `lambda_function.py` komplett durch
+   [skill/lambda_relay.py](skill/lambda_relay.py) ersetzen, oben `SERVER_URL`
+   (Tunnel-Adresse mit `/relay`) und `RELAY_TOKEN` eintragen → **Save** → **Deploy**.
+5. Testen wie gehabt. Ein `ALEXA_SKILL_ID`-Eintrag ist bei diesem Weg optional;
+   die Absicherung übernimmt das Token.
+
 ## 5. Autostart (optional, empfohlen)
 
 Damit alles nach einem Neustart des PCs von selbst läuft:

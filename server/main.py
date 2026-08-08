@@ -11,10 +11,11 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import agent, llm, memory
-from .alexa import build_webservice_handler
+from . import agent, config, llm, memory
+from .alexa import build_relay_handler, build_webservice_handler
 
 webservice_handler = build_webservice_handler()
+relay_handler = build_relay_handler()
 
 
 @asynccontextmanager
@@ -46,6 +47,26 @@ async def alexa_endpoint(request: Request):
         return JSONResponse(content=response)
     except Exception as exc:  # Signatur ungültig o.ä. -> Anfrage ablehnen
         print(f"Alexa-Anfrage abgelehnt: {exc!r}")
+        return JSONResponse(content={"error": "invalid request"}, status_code=400)
+
+
+@app.post("/relay")
+async def relay_endpoint(request: Request):
+    """Empfängt Alexa-Anfragen vom Alexa-hosted Vermittler-Skill (Lambda).
+
+    Abgesichert über ein gemeinsames Geheimnis statt der Amazon-Signatur,
+    denn die Lambda-Weiterleitung trägt keine Signatur-Header mehr.
+    """
+    if not config.RELAY_TOKEN or request.headers.get("x-relay-token") != config.RELAY_TOKEN:
+        return JSONResponse(content={"error": "forbidden"}, status_code=403)
+    body = (await request.body()).decode("utf-8")
+    try:
+        response = await run_in_threadpool(
+            relay_handler.verify_request_and_dispatch, dict(request.headers), body
+        )
+        return JSONResponse(content=response)
+    except Exception as exc:
+        print(f"Relay-Anfrage fehlgeschlagen: {exc!r}")
         return JSONResponse(content={"error": "invalid request"}, status_code=400)
 
 

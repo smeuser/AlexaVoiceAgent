@@ -14,6 +14,10 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 
 ALEXA_SKILL_ID = os.getenv("ALEXA_SKILL_ID", "").strip()
 
+# Geheimes Token für den Relay-Endpoint (Alexa-hosted Skill als Vermittler).
+# Muss identisch in der Lambda-Funktion des Skills eingetragen sein.
+RELAY_TOKEN = os.getenv("RELAY_TOKEN", "").strip()
+
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
 

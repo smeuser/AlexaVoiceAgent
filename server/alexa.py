@@ -112,7 +112,7 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
         )
 
 
-def build_webservice_handler() -> WebserviceSkillHandler:
+def _build_skill_builder() -> SkillBuilder:
     sb = SkillBuilder()
     if config.ALEXA_SKILL_ID:
         sb.skill_id = config.ALEXA_SKILL_ID
@@ -126,6 +126,20 @@ def build_webservice_handler() -> WebserviceSkillHandler:
     ):
         sb.add_request_handler(handler)
     sb.add_exception_handler(CatchAllExceptionHandler())
+    return sb
+
+
+def build_webservice_handler() -> WebserviceSkillHandler:
     # verify_signature=True prüft, dass Anfragen wirklich von Amazon kommen —
     # wichtig, weil der Endpoint über den Tunnel öffentlich erreichbar ist.
-    return WebserviceSkillHandler(skill=sb.create(), verify_signature=True, verify_timestamp=True)
+    return WebserviceSkillHandler(
+        skill=_build_skill_builder().create(), verify_signature=True, verify_timestamp=True
+    )
+
+
+def build_relay_handler() -> WebserviceSkillHandler:
+    # Für den Relay-Weg (Alexa-hosted Skill als Vermittler) gibt es keine
+    # Amazon-Signatur mehr; die Absicherung übernimmt das RELAY_TOKEN in main.py.
+    return WebserviceSkillHandler(
+        skill=_build_skill_builder().create(), verify_signature=False, verify_timestamp=False
+    )
