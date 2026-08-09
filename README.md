@@ -247,6 +247,23 @@ Hinweis: Während einer laufenden Recherche ist die Grafikkarte kurz mit der
 Zusammenfassung beschäftigt — eine gleichzeitige Alexa-Frage kann dann einmalig
 etwas länger dauern.
 
+**Lehren aus der Praxis:**
+
+- Recherche-Aufträge brauchen einen **eigenen Intent** (`RechercheIntent`): Alexa
+  verschluckt Trägerphrasen — bei einem Muster wie `"recherchiere {frage}"` kommt
+  das Wort „recherchiere“ **nie** im Slot-Text an, der Server sieht nur den Rest
+  und kann den Auftrag nicht am Wortlaut erkennen. Die Textmuster-Erkennung in
+  [server/alexa.py](server/alexa.py) bleibt nur als Sicherheitsnetz für den
+  `/chat`-Endpoint und getippte Eingaben.
+- „Alexa, recherchiere …“ (ohne Skill-Aufruf) landet bei der normalen Alexa, die
+  dann selbst antwortet („Ich kann keine Informationen … finden“). Der Skill muss
+  im Spiel sein: Sitzung öffnen oder „Alexa, frage mein hausgeist: recherchiere …“.
+- Einzelne nicht lesbare Quellen (z.B. Facebook blockt automatisierte Zugriffe)
+  sind normal und werden übersprungen — steht dann als Hinweis im `server.log`.
+- Nach einer versehentlich als normale Frage beantworteten Recherche lohnt ein
+  Blick in `KI-Gedaechtnis/` — das Modell merkt sich sonst seine eigene
+  halluzinierte Antwort als „Fakt“.
+
 ## Wie das Gedächtnis funktioniert
 
 - **Lesen:** Vor jeder Antwort durchsucht der Server deinen Vault (semantische Suche über
@@ -277,3 +294,7 @@ etwas länger dauern.
   kleine Modelle ignorieren es aber gelegentlich.
 - **QuickEdit-Falle:** Bei manuell gestartetem Server friert ein Klick ins cmd-Fenster den
   Prozess ein, bis Enter/Esc gedrückt wird (Symptom: alle Anfragen timen aus).
+- **Log-Zeilen kopieren:** Konsolen-Ausgaben direkt in die Zwischenablage schicken statt
+  mühsam zu markieren — z.B.
+  `powershell -c "Get-Content server.log -Tail 20 | Set-Clipboard"`
+  (in der cmd geht für beliebige Befehle auch `... | clip`).
