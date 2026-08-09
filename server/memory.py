@@ -62,7 +62,7 @@ def refresh_index() -> None:
             _cache = _load_cache()  # einmalig beim Start von der Platte
 
         if not config.VAULT_PATH.is_dir():
-            print(f"Warnung: Vault-Pfad nicht gefunden: {config.VAULT_PATH}")
+            config.log(f"Warnung: Vault-Pfad nicht gefunden: {config.VAULT_PATH}")
             _cache, _chunks, _matrix, _built = {}, [], None, True
             return
 
@@ -86,7 +86,7 @@ def refresh_index() -> None:
                 "chunks": [{"text": t, "vector": v} for t, v in zip(texts, vectors)],
             }
             changed = True
-            print(f"Indexiert: {rel} ({len(texts)} Abschnitte)")
+            config.log(f"Indexiert: {rel} ({len(texts)} Abschnitte)")
 
         if len(new_cache) != len(_cache):
             changed = True  # Dateien wurden gelöscht
@@ -120,7 +120,7 @@ def search(query: str, k: int = 4) -> list[dict]:
         return []
     q = np.array(llm.embed([query])[0], dtype=np.float32)
     t2 = time.monotonic()
-    print(f"Suche-Detail: Vault-Abgleich {t1 - t0:.2f}s, Frage-Embedding {t2 - t1:.2f}s")
+    config.log(f"Suche-Detail: Vault-Abgleich {t1 - t0:.2f}s, Frage-Embedding {t2 - t1:.2f}s")
     norm = np.linalg.norm(q)
     if norm == 0:
         return []
@@ -145,7 +145,7 @@ def remember(fact: str) -> None:
     else:
         with note.open("a", encoding="utf-8") as f:
             f.write(line)
-    print(f"Gemerkt: {fact.strip()}")
+    config.log(f"Gemerkt: {fact.strip()}")
 
 
 def extract_memories(reply: str) -> tuple[str, list[str]]:

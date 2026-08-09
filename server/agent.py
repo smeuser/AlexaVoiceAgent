@@ -45,7 +45,7 @@ def answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
         # die Neu-Einbettung der geänderten Gedächtnis-Notiz bezahlen muss.
         threading.Thread(target=memory.refresh_index, daemon=True).start()
     # Alexa bricht nach ~8s ab (Lambda wartet 7s) — diese Zeile zeigt, wo die Zeit bleibt
-    print(f"Timing: Suche {t_search:.1f}s, Modell {t_total - t_search:.1f}s, gesamt {t_total:.1f}s")
+    config.log(f"Timing: Suche {t_search:.1f}s, Modell {t_total - t_search:.1f}s, gesamt {t_total:.1f}s")
     spoken = _sanitize_for_speech(spoken_raw) or "Dazu fällt mir gerade nichts ein."
     new_history = history[-MAX_HISTORY_MESSAGES:] + [
         {"role": "user", "content": question},

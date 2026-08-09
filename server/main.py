@@ -20,10 +20,10 @@ relay_handler = build_relay_handler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Lade Modelle und indexiere den Vault ...")
+    config.log("Lade Modelle und indexiere den Vault ...")
     await run_in_threadpool(llm.warmup)
     await run_in_threadpool(memory.refresh_index)
-    print("Bereit.")
+    config.log("Bereit.")
     yield
 
 
@@ -46,7 +46,7 @@ async def alexa_endpoint(request: Request):
         )
         return JSONResponse(content=response)
     except Exception as exc:  # Signatur ungültig o.ä. -> Anfrage ablehnen
-        print(f"Alexa-Anfrage abgelehnt: {exc!r}")
+        config.log(f"Alexa-Anfrage abgelehnt: {exc!r}")
         return JSONResponse(content={"error": "invalid request"}, status_code=400)
 
 
@@ -66,7 +66,7 @@ async def relay_endpoint(request: Request):
         )
         return JSONResponse(content=response)
     except Exception as exc:
-        print(f"Relay-Anfrage fehlgeschlagen: {exc!r}")
+        config.log(f"Relay-Anfrage fehlgeschlagen: {exc!r}")
         return JSONResponse(content={"error": "invalid request"}, status_code=400)
 
 

@@ -67,7 +67,7 @@ class ChatHandler(AbstractRequestHandler):
                     f"Die Recherche zu {topic} ist fertig. Frag mich, was ich herausgefunden habe.",
                 )
             except Exception as exc:
-                print(f"Erinnerung konnte nicht angelegt werden: {exc!r}")
+                config.log(f"Erinnerung konnte nicht angelegt werden: {exc!r}")
             if reminder_ok:
                 speech = f"Ich recherchiere zu: {topic}. In fünf Minuten erinnere ich dich, dann liegen die Ergebnisse bereit."
             else:
@@ -129,7 +129,7 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
         return True
 
     def handle(self, handler_input: HandlerInput, exception: Exception) -> Response:
-        print(f"Fehler im Skill: {exception!r}")
+        config.log(f"Fehler im Skill: {exception!r}")
         return (
             handler_input.response_builder
             .speak("Entschuldigung, da ist etwas schiefgegangen. Versuche es bitte noch einmal.")

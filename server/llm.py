@@ -56,4 +56,4 @@ def warmup() -> None:
         embed(["warmup"])
         chat([{"role": "user", "content": "Sag nur: bereit."}], timeout=120.0)
     except requests.RequestException as exc:
-        print(f"Warnung: Ollama-Warmup fehlgeschlagen: {exc}")
+        config.log(f"Warnung: Ollama-Warmup fehlgeschlagen: {exc}")

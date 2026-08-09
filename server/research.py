@@ -48,17 +48,17 @@ def _fetch_page_text(url: str, max_chars: int = 4000) -> str:
         text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
         return text[:max_chars]
     except Exception as exc:
-        print(f"Recherche: Seite nicht lesbar ({url}): {exc!r}")
+        config.log(f"Recherche: Seite nicht lesbar ({url}): {exc!r}")
         return ""
 
 
 def run_research(topic: str) -> None:
     """Führt die komplette Recherche aus und schreibt die Ergebnis-Notiz. Läuft im Thread."""
-    print(f"Recherche gestartet: {topic}")
+    config.log(f"Recherche gestartet: {topic}")
     try:
         results = list(DDGS().text(topic, region="de-de", max_results=8) or [])
     except Exception as exc:
-        print(f"Recherche: Websuche fehlgeschlagen: {exc!r}")
+        config.log(f"Recherche: Websuche fehlgeschlagen: {exc!r}")
         results = []
 
     material: list[str] = []
@@ -86,7 +86,7 @@ def run_research(topic: str) -> None:
                 num_predict=700,
             )
         except Exception as exc:
-            print(f"Recherche: Zusammenfassung fehlgeschlagen: {exc!r}")
+            config.log(f"Recherche: Zusammenfassung fehlgeschlagen: {exc!r}")
             summary = "Die Zusammenfassung ist fehlgeschlagen. Die Quellen unten enthalten das Rohmaterial."
     else:
         summary = "Die Websuche hat zu diesem Thema leider keine brauchbaren Ergebnisse geliefert."
@@ -105,7 +105,7 @@ def run_research(topic: str) -> None:
         "## Quellen",
     ] + [f"- [{title}]({url})" for title, url in sources]
     note.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"Recherche abgeschlossen: {note.name}")
+    config.log(f"Recherche abgeschlossen: {note.name}")
     memory.refresh_index()
 
 
@@ -129,6 +129,6 @@ def create_reminder(api_endpoint: str, api_token: str, text: str, offset_seconds
         timeout=3,
     )
     if resp.status_code not in (200, 201):
-        print(f"Erinnerung fehlgeschlagen ({resp.status_code}): {resp.text[:200]}")
+        config.log(f"Erinnerung fehlgeschlagen ({resp.status_code}): {resp.text[:200]}")
         return False
     return True

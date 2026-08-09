@@ -1,9 +1,16 @@
 import os
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def log(message: str) -> None:
+    """Log-Zeile mit Zeitstempel; flush=True, damit server.log im
+    Dienst-Betrieb sofort aktuell ist (sonst puffert Python die Ausgabe)."""
+    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {message}", flush=True)
 
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "./vault"))
 MEMORY_FOLDER = os.getenv("MEMORY_FOLDER", "KI-Gedaechtnis")
