@@ -67,9 +67,20 @@ def main() -> None:
     permissions = manifest.setdefault("permissions", [])
     if not any(p.get("name") == PERMISSION for p in permissions):
         permissions.append({"name": PERMISSION})
-    publications = manifest.setdefault("events", {}).setdefault("publications", [])
+    events = manifest.setdefault("events", {})
+    publications = events.setdefault("publications", [])
     if not any(p.get("eventName") == EVENT for p in publications):
         publications.append({"eventName": EVENT})
+    # Amazon verlangt im events-Block zwingend einen Endpoint — wir übernehmen
+    # den bestehenden Skill-Endpoint aus dem Manifest.
+    if "endpoint" not in events:
+        custom_endpoint = manifest.get("apis", {}).get("custom", {}).get("endpoint")
+        if not custom_endpoint:
+            sys.exit(
+                "Im Manifest ist kein Skill-Endpoint hinterlegt (apis.custom.endpoint fehlt) — "
+                "bitte melden, dann lösen wir das gemeinsam."
+            )
+        events["endpoint"] = custom_endpoint
 
     print("Schreibe aktualisiertes Manifest ...")
     resp = requests.put(

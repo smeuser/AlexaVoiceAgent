@@ -4,6 +4,7 @@ Start (im Projektordner):
     uvicorn server.main:app --host 0.0.0.0 --port 8000
 """
 
+import json
 import logging.config
 from contextlib import asynccontextmanager
 
@@ -72,6 +73,17 @@ async def relay_endpoint(request: Request):
     if not config.RELAY_TOKEN or request.headers.get("x-relay-token") != config.RELAY_TOKEN:
         return JSONResponse(content={"error": "forbidden"}, status_code=403)
     body = (await request.body()).decode("utf-8")
+
+    # Skill-Lebenszyklus-Ereignisse (Skill aktiviert, Berechtigung erteilt/entzogen)
+    # kommen über den events-Endpoint des Manifests — nur loggen und quittieren.
+    try:
+        request_type = json.loads(body).get("request", {}).get("type", "")
+    except (ValueError, AttributeError):
+        request_type = ""
+    if request_type.startswith("AlexaSkillEvent."):
+        config.log(f"Skill-Ereignis empfangen: {request_type}")
+        return JSONResponse(content={})
+
     try:
         response = await run_in_threadpool(
             relay_handler.verify_request_and_dispatch, dict(request.headers), body
