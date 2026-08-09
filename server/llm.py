@@ -31,7 +31,15 @@ def embed(texts: list[str], timeout: float = 60.0) -> list[list[float]]:
     """Erzeugt Embedding-Vektoren für eine Liste von Texten."""
     resp = requests.post(
         f"{config.OLLAMA_URL}/api/embed",
-        json={"model": config.EMBED_MODEL, "input": texts, "keep_alive": -1},
+        json={
+            "model": config.EMBED_MODEL,
+            "input": texts,
+            "keep_alive": -1,
+            # Embedding-Modell auf der CPU rechnen lassen: es ist klein genug,
+            # und so verdrängt es nicht das Chat-Modell aus dem Grafikspeicher
+            # (das Hin- und Herladen kostete sonst bei jeder Frage Sekunden).
+            "options": {"num_gpu": 0},
+        },
         timeout=timeout,
     )
     resp.raise_for_status()
