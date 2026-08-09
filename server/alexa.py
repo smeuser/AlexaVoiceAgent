@@ -13,8 +13,30 @@ from . import agent, config, research
 
 REPROMPT = "Was möchtest du noch wissen?"
 
-# Fragen, die mit diesen Wörtern beginnen, sind Recherche-Aufträge
+# Für den /chat-Testendpoint: Fragen mit diesen Anfangswörtern sind Recherche-Aufträge.
+# (Am Echo übernimmt das der RechercheIntent — Alexa verschluckt Trägerphrasen,
+# das Wort "recherchiere" käme im Slot-Text nie an.)
 RESEARCH_TRIGGER = re.compile(r"^(?:recherchiere|recherchier|finde heraus)[,:]?\s*(.*)", re.IGNORECASE)
+
+
+def _research_response(handler_input: HandlerInput, topic: str) -> Response:
+    """Startet die Hintergrund-Recherche und antwortet sofort (inkl. Erinnerung, falls erlaubt)."""
+    research.start_research(topic)
+    system = handler_input.request_envelope.context.system
+    reminder_ok = False
+    try:
+        reminder_ok = research.create_reminder(
+            system.api_endpoint,
+            system.api_access_token,
+            f"Die Recherche zu {topic} ist fertig. Frag mich, was ich herausgefunden habe.",
+        )
+    except Exception as exc:
+        config.log(f"Erinnerung konnte nicht angelegt werden: {exc!r}")
+    if reminder_ok:
+        speech = f"Ich recherchiere zu: {topic}. In fünf Minuten erinnere ich dich, dann liegen die Ergebnisse bereit."
+    else:
+        speech = f"Ich recherchiere zu: {topic}. Frag mich in ein paar Minuten, was ich herausgefunden habe."
+    return handler_input.response_builder.speak(speech).ask(REPROMPT).response
 
 
 def _get_history(handler_input: HandlerInput) -> list[dict]:
@@ -54,29 +76,32 @@ class ChatHandler(AbstractRequestHandler):
                 .response
             )
 
+        # Sicherheitsnetz: Falls das Wort doch im Text ankommt (z.B. im Test-Tab getippt)
         match = RESEARCH_TRIGGER.match(question.strip())
         if match:
-            topic = match.group(1).strip() or question.strip()
-            research.start_research(topic)
-            system = handler_input.request_envelope.context.system
-            reminder_ok = False
-            try:
-                reminder_ok = research.create_reminder(
-                    system.api_endpoint,
-                    system.api_access_token,
-                    f"Die Recherche zu {topic} ist fertig. Frag mich, was ich herausgefunden habe.",
-                )
-            except Exception as exc:
-                config.log(f"Erinnerung konnte nicht angelegt werden: {exc!r}")
-            if reminder_ok:
-                speech = f"Ich recherchiere zu: {topic}. In fünf Minuten erinnere ich dich, dann liegen die Ergebnisse bereit."
-            else:
-                speech = f"Ich recherchiere zu: {topic}. Frag mich in ein paar Minuten, was ich herausgefunden habe."
-            return handler_input.response_builder.speak(speech).ask(REPROMPT).response
+            return _research_response(handler_input, match.group(1).strip() or question.strip())
 
         spoken, history = agent.answer(question, _get_history(handler_input))
         _set_history(handler_input, history)
         return handler_input.response_builder.speak(spoken).ask(REPROMPT).response
+
+
+class RechercheHandler(AbstractRequestHandler):
+    def can_handle(self, handler_input: HandlerInput) -> bool:
+        return is_intent_name("RechercheIntent")(handler_input)
+
+    def handle(self, handler_input: HandlerInput) -> Response:
+        slots = handler_input.request_envelope.request.intent.slots or {}
+        thema_slot = slots.get("thema")
+        topic = ((thema_slot.value if thema_slot else None) or "").strip()
+        if not topic:
+            return (
+                handler_input.response_builder
+                .speak("Was soll ich recherchieren? Sag zum Beispiel: recherchiere das Wetter in Wiesbaden.")
+                .ask(REPROMPT)
+                .response
+            )
+        return _research_response(handler_input, topic)
 
 
 class HelpHandler(AbstractRequestHandler):
@@ -144,6 +169,7 @@ def _build_skill_builder() -> SkillBuilder:
         sb.skill_id = config.ALEXA_SKILL_ID
     for handler in (
         LaunchHandler(),
+        RechercheHandler(),
         ChatHandler(),
         HelpHandler(),
         StopHandler(),

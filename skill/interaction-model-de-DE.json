@@ -24,11 +24,24 @@
             "wo {frage}",
             "ob {frage}",
             "merke dir {frage}",
-            "notiere {frage}",
-            "recherchiere {frage}",
-            "recherchier {frage}",
-            "recherchiere zu {frage}",
-            "finde heraus {frage}"
+            "notiere {frage}"
+          ]
+        },
+        {
+          "name": "RechercheIntent",
+          "slots": [
+            {
+              "name": "thema",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "recherchiere {thema}",
+            "recherchier {thema}",
+            "recherchiere zu {thema}",
+            "recherchiere bitte {thema}",
+            "finde heraus {thema}",
+            "finde alles heraus über {thema}"
           ]
         },
         { "name": "AMAZON.HelpIntent", "samples": [] },
