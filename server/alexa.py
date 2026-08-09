@@ -121,6 +121,19 @@ class HelpHandler(AbstractRequestHandler):
         )
 
 
+class DankeHandler(AbstractRequestHandler):
+    """'Danke' oder 'Nein (nichts mehr)' beendet die Sitzung höflich — ohne Nachfrage."""
+
+    def can_handle(self, handler_input: HandlerInput) -> bool:
+        return (
+            is_intent_name("DankeIntent")(handler_input)
+            or is_intent_name("AMAZON.NoIntent")(handler_input)
+        )
+
+    def handle(self, handler_input: HandlerInput) -> Response:
+        return handler_input.response_builder.speak("Gerne!").set_should_end_session(True).response
+
+
 class StopHandler(AbstractRequestHandler):
     def can_handle(self, handler_input: HandlerInput) -> bool:
         return (
@@ -175,6 +188,7 @@ def _build_skill_builder() -> SkillBuilder:
         LaunchHandler(),
         RechercheHandler(),
         ChatHandler(),
+        DankeHandler(),
         HelpHandler(),
         StopHandler(),
         FallbackHandler(),

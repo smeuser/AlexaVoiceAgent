@@ -44,6 +44,23 @@
             "finde alles heraus über {thema}"
           ]
         },
+        {
+          "name": "DankeIntent",
+          "slots": [],
+          "samples": [
+            "danke",
+            "danke schön",
+            "dankeschön",
+            "vielen dank",
+            "danke dir",
+            "das war alles",
+            "das war es",
+            "mehr nicht",
+            "nichts mehr",
+            "passt danke"
+          ]
+        },
+        { "name": "AMAZON.NoIntent", "samples": [] },
         { "name": "AMAZON.HelpIntent", "samples": [] },
         { "name": "AMAZON.StopIntent", "samples": [] },
         { "name": "AMAZON.CancelIntent", "samples": [] },
