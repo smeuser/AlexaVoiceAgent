@@ -135,7 +135,10 @@ def send_notification() -> bool:
             },
             timeout=10,
         )
-        token_resp.raise_for_status()
+        if token_resp.status_code != 200:
+            # Amazons Antwort nennt den Grund (invalid_client vs. invalid_scope)
+            config.log(f"Token-Abruf fehlgeschlagen ({token_resp.status_code}): {token_resp.text[:300]}")
+            return False
         token = token_resp.json()["access_token"]
 
         now = datetime.now(timezone.utc)
