@@ -13,10 +13,11 @@ def chat(messages: list[dict], timeout: float = 20.0) -> str:
             "model": config.CHAT_MODEL,
             "messages": messages,
             "stream": False,
-            # Modell 30 Min. im VRAM halten, sonst dauert jede Antwort zu lange für Alexa
-            "keep_alive": "30m",
+            # Modell dauerhaft im VRAM halten — ein Neuladen nach Leerlauf
+            # würde die 8-Sekunden-Frist von Alexa sofort reißen
+            "keep_alive": -1,
             "options": {
-                "num_predict": 220,  # kurze Antworten erzwingen (Alexa liest vor)
+                "num_predict": 150,  # kurze Antworten erzwingen (Alexa liest vor)
                 "temperature": 0.6,
             },
         },
@@ -30,7 +31,7 @@ def embed(texts: list[str], timeout: float = 60.0) -> list[list[float]]:
     """Erzeugt Embedding-Vektoren für eine Liste von Texten."""
     resp = requests.post(
         f"{config.OLLAMA_URL}/api/embed",
-        json={"model": config.EMBED_MODEL, "input": texts, "keep_alive": "30m"},
+        json={"model": config.EMBED_MODEL, "input": texts, "keep_alive": -1},
         timeout=timeout,
     )
     resp.raise_for_status()

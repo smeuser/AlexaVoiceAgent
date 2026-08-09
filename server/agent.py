@@ -1,6 +1,7 @@
 """Kernlogik: Frage -> Notiz-Suche -> Sprachmodell -> gesprochene Antwort + Gedächtnis."""
 
 import re
+import time
 
 from . import config, llm, memory
 
@@ -20,7 +21,9 @@ def _sanitize_for_speech(text: str) -> str:
 
 def answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
     """Beantwortet eine Frage. Gibt (gesprochene Antwort, neuer Verlauf) zurück."""
-    context_chunks = memory.search(question)
+    start = time.monotonic()
+    context_chunks = memory.search(question, k=3)
+    t_search = time.monotonic() - start
     context = "\n\n".join(
         f"[Notiz: {c['file']}]\n{c['text']}" for c in context_chunks
     ) or "(keine passenden Notizen gefunden)"
@@ -32,6 +35,9 @@ def answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
     )
 
     reply = llm.chat(messages)
+    t_total = time.monotonic() - start
+    # Alexa bricht nach ~8s ab (Lambda wartet 7s) — diese Zeile zeigt, wo die Zeit bleibt
+    print(f"Timing: Suche {t_search:.1f}s, Modell {t_total - t_search:.1f}s, gesamt {t_total:.1f}s")
     spoken, facts = memory.extract_memories(reply)
     for fact in facts:
         memory.remember(fact)
