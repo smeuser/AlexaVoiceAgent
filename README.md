@@ -235,9 +235,12 @@ Der Hausgeist kann im Web recherchieren — aber wegen Alexas 8-Sekunden-Limit n
 `.env` die Werte `ALEXA_CLIENT_ID`/`ALEXA_CLIENT_SECRET` gesetzt (Developer Console →
 Build → **Permissions**, Abschnitt „Alexa Skill Messaging“), schickt der Server **exakt
 bei Fertigstellung** eine Benachrichtigung an alle Echos (Signalton + gelber Ring,
-„Neue Nachricht von Hausgeist“). Zusätzlich muss in der Console die Berechtigung
-**Alexa Notifications** aktiv sein und in der Alexa-App beim Skill „Benachrichtigungen“
-erlaubt werden. Die Ergebnisse holt man sich dann mit **„was gibt es Neues?“**
+„Neue Nachricht von Hausgeist“). Zusätzlich muss der Skill einmalig für Benachrichtigungen
+freigeschaltet werden — das bietet die Console-Oberfläche nicht an, es geht nur über die
+Verwaltungs-API: `npm install -g ask-cli` → `ask configure` (Browser-Anmeldung, AWS-Frage
+mit „No“) → `.venv\Scripts\python.exe -m server.enable_notifications <Skill-ID>`.
+Danach in der Alexa-App beim Skill „Benachrichtigungen“ erlauben.
+Die Ergebnisse holt man sich dann mit **„was gibt es Neues?“**
 (eigener Intent, liest die jüngste Recherche direkt vor). Ohne die beiden
 `.env`-Werte bleibt automatisch die gesprochene Erinnerung nach ~1 Minute aktiv.
 
