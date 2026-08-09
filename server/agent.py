@@ -39,11 +39,14 @@ def answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
     t_total = time.monotonic() - start
     spoken_raw, facts = memory.extract_memories(reply)
     if facts:
-        for fact in facts:
-            memory.remember(fact)
-        # Sofort im Hintergrund neu indexieren, damit nicht die nächste Frage
-        # die Neu-Einbettung der geänderten Gedächtnis-Notiz bezahlen muss.
-        threading.Thread(target=memory.refresh_index, daemon=True).start()
+        # Komplett im Hintergrund: Duplikat-Prüfung, Speichern und Neu-Indexierung
+        # dürfen die Alexa-Antwortzeit nicht belasten.
+        def _store() -> None:
+            for fact in facts:
+                memory.remember(fact)
+            memory.refresh_index()
+
+        threading.Thread(target=_store, daemon=True).start()
     # Alexa bricht nach ~8s ab (Lambda wartet 7s) — diese Zeile zeigt, wo die Zeit bleibt
     config.log(f"Timing: Suche {t_search:.1f}s, Modell {t_total - t_search:.1f}s, gesamt {t_total:.1f}s")
     spoken = _sanitize_for_speech(spoken_raw) or "Dazu fällt mir gerade nichts ein."

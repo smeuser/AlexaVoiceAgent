@@ -133,8 +133,54 @@ def search(query: str, k: int = 4) -> list[dict]:
     ]
 
 
+_ENTRY_PATTERN = re.compile(r"^-\s*(\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2})?)\s*—\s*(.+)$")
+
+
+def _normalize(text: str) -> str:
+    """Für den Wortlaut-Vergleich: Kleinschreibung, ohne Satzzeichen/Mehrfach-Leerzeichen."""
+    text = re.sub(r"[^\wäöüß ]", " ", text.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def collect_memory_entries() -> list[tuple[str, str]]:
+    """Liest alle Gedächtnis-Einträge als (Datum, Fakt) aus dem Gedächtnis-Ordner."""
+    folder = config.VAULT_PATH / config.MEMORY_FOLDER
+    entries: list[tuple[str, str]] = []
+    if folder.is_dir():
+        for path in sorted(folder.glob("*.md")):
+            for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                m = _ENTRY_PATTERN.match(line.strip())
+                if m:
+                    entries.append((m.group(1), m.group(2).strip()))
+    return entries
+
+
+def _is_already_known(fact: str) -> bool:
+    """True, wenn der Fakt wortgleich oder inhaltlich schon im Gedächtnis steht."""
+    existing = [f for _, f in collect_memory_entries()][-300:]  # Obergrenze als Kostenbremse
+    if not existing:
+        return False
+    norm = _normalize(fact)
+    if any(_normalize(f) == norm for f in existing):
+        return True
+    # Inhaltlicher Vergleich über Embeddings (läuft auf der CPU, im Hintergrund-Thread)
+    vectors = np.array(llm.embed(existing + [fact]), dtype=np.float32)
+    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    vectors = vectors / norms
+    similarities = vectors[:-1] @ vectors[-1]
+    return bool(similarities.max() >= 0.92)
+
+
 def remember(fact: str) -> None:
-    """Hängt einen neuen Fakt an die Gedächtnis-Notiz des aktuellen Monats an."""
+    """Hängt einen neuen Fakt an die Gedächtnis-Notiz des aktuellen Monats an —
+    außer er ist (wortgleich oder inhaltlich) schon bekannt."""
+    try:
+        if _is_already_known(fact):
+            config.log(f"Nicht gemerkt (schon bekannt): {fact.strip()}")
+            return
+    except Exception as exc:
+        config.log(f"Duplikat-Prüfung fehlgeschlagen, merke trotzdem: {exc!r}")
     folder = config.VAULT_PATH / config.MEMORY_FOLDER
     folder.mkdir(parents=True, exist_ok=True)
     now = datetime.now()

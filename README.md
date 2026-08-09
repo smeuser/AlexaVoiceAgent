@@ -273,6 +273,21 @@ etwas länger dauern.
   „merke dir …“), legt es ihn als Zeile in `KI-Gedaechtnis/JJJJ-MM.md` im Vault ab. Beim
   nächsten Gespräch wird diese Notiz mit durchsucht – so „lernt“ das System.
 - Du kannst das Gedächtnis jederzeit in Obsidian öffnen, korrigieren oder löschen.
+- **Duplikatschutz:** Vor dem Speichern prüft der Server, ob der Fakt wortgleich oder
+  inhaltlich (Embedding-Vergleich) schon im Gedächtnis steht — Bekanntes wird nicht
+  erneut gespeichert (im Log: „Nicht gemerkt (schon bekannt): …“). Das läuft komplett
+  im Hintergrund und kostet keine Antwortzeit.
+- **Konsolidieren:** Haben sich trotzdem ähnliche Einträge angesammelt, räumt dieses
+  Kommando auf (im Projektordner, gelegentlich ausführen):
+
+  ```bat
+  .venv\Scripts\python.exe -m server.consolidate
+  ```
+
+  Es entfernt Wortlaut-Duplikate, lässt das Sprachmodell inhaltlich Gleiches
+  zusammenfassen und schreibt alles nach `KI-Gedaechtnis/Gedaechtnis.md`. Die alten
+  Dateien bleiben als `.bak`-Backup liegen (werden nicht mehr indexiert) und können
+  nach einer Sichtkontrolle in Obsidian gelöscht werden.
 
 ## Wenn etwas hakt
 
