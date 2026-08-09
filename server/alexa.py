@@ -29,11 +29,15 @@ def _research_response(handler_input: HandlerInput, topic: str) -> Response:
             system.api_endpoint,
             system.api_access_token,
             f"Die Recherche zu {topic} ist fertig. Frag mich, was ich herausgefunden habe.",
+            # Die Erinnerung muss beim Auftrag angelegt werden (nur da gilt das
+            # Alexa-Token) — die Recherche selbst ist fast immer in unter einer
+            # Minute fertig, daher knapp danach klingeln.
+            offset_seconds=75,
         )
     except Exception as exc:
         config.log(f"Erinnerung konnte nicht angelegt werden: {exc!r}")
     if reminder_ok:
-        speech = f"Ich recherchiere zu: {topic}. In fünf Minuten erinnere ich dich, dann liegen die Ergebnisse bereit."
+        speech = f"Ich recherchiere zu: {topic}. Ich erinnere dich in einer Minute, dann liegen die Ergebnisse bereit."
     else:
         speech = f"Ich recherchiere zu: {topic}. Frag mich in ein paar Minuten, was ich herausgefunden habe."
     return handler_input.response_builder.speak(speech).ask(REPROMPT).response
