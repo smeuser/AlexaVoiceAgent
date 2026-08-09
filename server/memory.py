@@ -8,6 +8,7 @@ Der Index wird gecacht und nur für geänderte Dateien neu berechnet.
 import json
 import re
 import threading
+import time
 from datetime import datetime
 
 import numpy as np
@@ -112,10 +113,14 @@ def refresh_index() -> None:
 
 def search(query: str, k: int = 4) -> list[dict]:
     """Liefert die k relevantesten Notiz-Abschnitte zur Frage."""
+    t0 = time.monotonic()
     refresh_index()
+    t1 = time.monotonic()
     if _matrix is None:
         return []
     q = np.array(llm.embed([query])[0], dtype=np.float32)
+    t2 = time.monotonic()
+    print(f"Suche-Detail: Vault-Abgleich {t1 - t0:.2f}s, Frage-Embedding {t2 - t1:.2f}s")
     norm = np.linalg.norm(q)
     if norm == 0:
         return []
