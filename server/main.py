@@ -4,15 +4,27 @@ Start (im Projektordner):
     uvicorn server.main:app --host 0.0.0.0 --port 8000
 """
 
+import logging.config
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from uvicorn.config import LOGGING_CONFIG
 
 from . import agent, config, llm, memory, research
 from .alexa import build_relay_handler, build_webservice_handler
+
+# Uvicorns eigene Log-Zeilen (INFO: ... / Zugriffsprotokoll) bekommen dieselben
+# Zeitstempel wie unsere config.log()-Meldungen.
+LOGGING_CONFIG["formatters"]["default"]["fmt"] = "[%(asctime)s] %(levelprefix)s %(message)s"
+LOGGING_CONFIG["formatters"]["access"]["fmt"] = (
+    '[%(asctime)s] %(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s'
+)
+for _formatter in LOGGING_CONFIG["formatters"].values():
+    _formatter["datefmt"] = "%Y-%m-%d %H:%M:%S"
+logging.config.dictConfig(LOGGING_CONFIG)
 
 webservice_handler = build_webservice_handler()
 relay_handler = build_relay_handler()
