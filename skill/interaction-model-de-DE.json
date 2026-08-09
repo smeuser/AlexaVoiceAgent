@@ -45,6 +45,18 @@
           ]
         },
         {
+          "name": "NeuigkeitenIntent",
+          "slots": [],
+          "samples": [
+            "was gibt es neues",
+            "was gibt's neues",
+            "gibt es etwas neues",
+            "gibt es neuigkeiten",
+            "was hast du für mich",
+            "erzähl mir die neuigkeiten"
+          ]
+        },
+        {
           "name": "DankeIntent",
           "slots": [],
           "samples": [

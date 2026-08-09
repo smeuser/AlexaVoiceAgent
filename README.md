@@ -231,6 +231,16 @@ Der Hausgeist kann im Web recherchieren — aber wegen Alexas 8-Sekunden-Limit n
 4. **Abrufen:** „Alexa, frage mein hausgeist, was hast du zum Tomatenfest
    herausgefunden“ — die normale Notiz-Suche findet die frische Recherche.
 
+**Ausbaustufe: Benachrichtigung statt Zeit-Erinnerung (gelber Ring).** Sind in der
+`.env` die Werte `ALEXA_CLIENT_ID`/`ALEXA_CLIENT_SECRET` gesetzt (Developer Console →
+Build → **Permissions**, Abschnitt „Alexa Skill Messaging“), schickt der Server **exakt
+bei Fertigstellung** eine Benachrichtigung an alle Echos (Signalton + gelber Ring,
+„Neue Nachricht von Hausgeist“). Zusätzlich muss in der Console die Berechtigung
+**Alexa Notifications** aktiv sein und in der Alexa-App beim Skill „Benachrichtigungen“
+erlaubt werden. Die Ergebnisse holt man sich dann mit **„was gibt es Neues?“**
+(eigener Intent, liest die jüngste Recherche direkt vor). Ohne die beiden
+`.env`-Werte bleibt automatisch die gesprochene Erinnerung nach ~1 Minute aktiv.
+
 **Einmalige Einrichtung der Erinnerungen** (sonst entfällt nur die Erinnerung, die
 Recherche selbst läuft trotzdem):
 

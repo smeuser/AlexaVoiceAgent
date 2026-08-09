@@ -26,6 +26,12 @@ ALEXA_SKILL_ID = os.getenv("ALEXA_SKILL_ID", "").strip()
 # Muss identisch in der Lambda-Funktion des Skills eingetragen sein.
 RELAY_TOKEN = os.getenv("RELAY_TOKEN", "").strip()
 
+# Zugangsdaten für Alexa-Benachrichtigungen (Proactive Events, "gelber Ring").
+# Stehen in der Developer Console unter Build -> Permissions ("Alexa Skill Messaging").
+# Solange leer, wird stattdessen die Zeit-Erinnerung als Fallback genutzt.
+ALEXA_CLIENT_ID = os.getenv("ALEXA_CLIENT_ID", "").strip()
+ALEXA_CLIENT_SECRET = os.getenv("ALEXA_CLIENT_SECRET", "").strip()
+
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
 

@@ -9,7 +9,7 @@ from ask_sdk_core.utils import is_intent_name, is_request_type
 from ask_sdk_model import Response
 from ask_sdk_webservice_support.webservice_handler import WebserviceSkillHandler
 
-from . import agent, config, research
+from . import agent, config, memory, research
 
 REPROMPT = "Was möchtest du noch wissen?"
 
@@ -22,6 +22,13 @@ RESEARCH_TRIGGER = re.compile(r"^(?:recherchiere|recherchier|finde heraus)[,:]?\
 def _research_response(handler_input: HandlerInput, topic: str) -> Response:
     """Startet die Hintergrund-Recherche und antwortet sofort (inkl. Erinnerung, falls erlaubt)."""
     research.start_research(topic)
+    if research.notifications_configured():
+        # Gelber Ring kommt exakt bei Fertigstellung — keine Zeit-Erinnerung nötig
+        speech = (
+            f"Ich recherchiere zu: {topic}. "
+            "Ich gebe dir ein Zeichen, sobald die Ergebnisse bereitliegen — frag mich dann einfach, was es Neues gibt."
+        )
+        return handler_input.response_builder.speak(speech).ask(REPROMPT).response
     system = handler_input.request_envelope.context.system
     reminder_ok = False
     try:
@@ -121,6 +128,31 @@ class HelpHandler(AbstractRequestHandler):
         )
 
 
+class NeuigkeitenHandler(AbstractRequestHandler):
+    """'Was gibt es Neues?' — liest die jüngste Recherche vor, ohne Umweg über die Suche."""
+
+    def can_handle(self, handler_input: HandlerInput) -> bool:
+        return is_intent_name("NeuigkeitenIntent")(handler_input)
+
+    def handle(self, handler_input: HandlerInput) -> Response:
+        latest = memory.latest_research_note()
+        if not latest:
+            return (
+                handler_input.response_builder
+                .speak("Ich habe gerade keine neuen Rechercheergebnisse für dich.")
+                .ask(REPROMPT)
+                .response
+            )
+        rel, text = latest
+        body = text.split("## Quellen")[0]
+        body = "\n".join(
+            line for line in body.splitlines()
+            if line.strip() and not line.startswith("#") and not line.startswith("Recherchiert am")
+        )
+        spoken = agent._sanitize_for_speech(body)[:1200] or "Die letzte Recherche war leider ergebnislos."
+        return handler_input.response_builder.speak(spoken).ask(REPROMPT).response
+
+
 class DankeHandler(AbstractRequestHandler):
     """'Danke' oder 'Nein (nichts mehr)' beendet die Sitzung höflich — ohne Nachfrage."""
 
@@ -187,6 +219,7 @@ def _build_skill_builder() -> SkillBuilder:
     for handler in (
         LaunchHandler(),
         RechercheHandler(),
+        NeuigkeitenHandler(),
         ChatHandler(),
         DankeHandler(),
         HelpHandler(),

@@ -8,7 +8,8 @@ die normale Notiz-Suche die Ergebnisse ("Was hast du zu ... herausgefunden?").
 
 import re
 import threading
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 
 import requests
 from bs4 import BeautifulSoup
@@ -107,10 +108,63 @@ def run_research(topic: str) -> None:
     note.write_text("\n".join(lines) + "\n", encoding="utf-8")
     config.log(f"Recherche abgeschlossen: {note.name}")
     memory.refresh_index()
+    if notifications_configured() and send_notification():
+        config.log("Benachrichtigung verschickt (gelber Ring an den Echos).")
 
 
 def start_research(topic: str) -> None:
     threading.Thread(target=run_research, args=(topic,), daemon=True).start()
+
+
+def notifications_configured() -> bool:
+    return bool(config.ALEXA_CLIENT_ID and config.ALEXA_CLIENT_SECRET)
+
+
+def send_notification() -> bool:
+    """Schickt über die Proactive-Events-API eine Benachrichtigung an alle Echos
+    (gelber Ring + Signalton: "Neue Nachricht von Hausgeist"). Läuft im
+    Recherche-Thread, exakt bei Fertigstellung."""
+    try:
+        token_resp = requests.post(
+            "https://api.amazon.com/auth/o2/token",
+            data={
+                "grant_type": "client_credentials",
+                "client_id": config.ALEXA_CLIENT_ID,
+                "client_secret": config.ALEXA_CLIENT_SECRET,
+                "scope": "alexa::proactive_events",
+            },
+            timeout=10,
+        )
+        token_resp.raise_for_status()
+        token = token_resp.json()["access_token"]
+
+        now = datetime.now(timezone.utc)
+        event = {
+            "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.00Z"),
+            "referenceId": uuid.uuid4().hex,
+            "expiryTime": (now + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.00Z"),
+            "event": {
+                "name": "AMAZON.MessageAlert.Activated",
+                "payload": {
+                    "state": {"status": "UNREAD", "freshness": "NEW"},
+                    "messageGroup": {"creator": {"name": "Hausgeist"}, "count": 1},
+                },
+            },
+            "relevantAudience": {"type": "Multicast", "payload": {}},
+        }
+        resp = requests.post(
+            "https://api.eu.amazonalexa.com/v1/proactiveEvents/stages/development",
+            json=event,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            timeout=10,
+        )
+        if resp.status_code not in (200, 202):
+            config.log(f"Benachrichtigung fehlgeschlagen ({resp.status_code}): {resp.text[:300]}")
+            return False
+        return True
+    except Exception as exc:
+        config.log(f"Benachrichtigung fehlgeschlagen: {exc!r}")
+        return False
 
 
 def create_reminder(api_endpoint: str, api_token: str, text: str, offset_seconds: int = 300) -> bool:
