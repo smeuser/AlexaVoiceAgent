@@ -21,7 +21,10 @@ RESEARCH_TRIGGER = re.compile(r"^(?:recherchiere|recherchier|finde heraus)[,:]?\
 
 def _research_response(handler_input: HandlerInput, topic: str) -> Response:
     """Startet die Hintergrund-Recherche und antwortet sofort (inkl. Erinnerung, falls erlaubt)."""
-    research.start_research(topic)
+    system = handler_input.request_envelope.context.system
+    # Konto des Auftraggebers: dorthin geht später die Fertig-Benachrichtigung
+    user_id = system.user.user_id if system.user else None
+    research.start_research(topic, user_id)
     if research.notifications_configured():
         # Gelber Ring kommt exakt bei Fertigstellung — keine Zeit-Erinnerung nötig
         speech = (
@@ -29,7 +32,6 @@ def _research_response(handler_input: HandlerInput, topic: str) -> Response:
             "Ich gebe dir ein Zeichen, sobald die Ergebnisse bereitliegen — frag mich dann einfach, was es Neues gibt."
         )
         return handler_input.response_builder.speak(speech).ask(REPROMPT).response
-    system = handler_input.request_envelope.context.system
     reminder_ok = False
     try:
         reminder_ok = research.create_reminder(

@@ -53,8 +53,12 @@ def _fetch_page_text(url: str, max_chars: int = 4000) -> str:
         return ""
 
 
-def run_research(topic: str) -> None:
-    """Führt die komplette Recherche aus und schreibt die Ergebnis-Notiz. Läuft im Thread."""
+def run_research(topic: str, user_id: str | None = None) -> None:
+    """Führt die komplette Recherche aus und schreibt die Ergebnis-Notiz. Läuft im Thread.
+
+    user_id ist das Alexa-Konto des Auftraggebers — die Fertig-Benachrichtigung
+    geht gezielt dorthin (mandantenfähig: wer fragt, bekommt das Klingeln).
+    """
     config.log(f"Recherche gestartet: {topic}")
     try:
         results = list(DDGS().text(topic, region="de-de", max_results=8) or [])
@@ -108,22 +112,28 @@ def run_research(topic: str) -> None:
     note.write_text("\n".join(lines) + "\n", encoding="utf-8")
     config.log(f"Recherche abgeschlossen: {note.name}")
     memory.refresh_index()
-    if notifications_configured() and send_notification():
-        config.log("Benachrichtigung verschickt (gelber Ring an den Echos).")
+    if notifications_configured() and send_notification(user_id):
+        target = "an das Konto des Auftraggebers" if user_id else "als Rundruf"
+        config.log(f"Benachrichtigung verschickt ({target}).")
 
 
-def start_research(topic: str) -> None:
-    threading.Thread(target=run_research, args=(topic,), daemon=True).start()
+def start_research(topic: str, user_id: str | None = None) -> None:
+    threading.Thread(target=run_research, args=(topic, user_id), daemon=True).start()
 
 
 def notifications_configured() -> bool:
     return bool(config.ALEXA_CLIENT_ID and config.ALEXA_CLIENT_SECRET)
 
 
-def send_notification() -> bool:
-    """Schickt über die Proactive-Events-API eine Benachrichtigung an alle Echos
-    (gelber Ring + Signalton: "Neue Nachricht von Hausgeist"). Läuft im
-    Recherche-Thread, exakt bei Fertigstellung."""
+def send_notification(user_id: str | None = None) -> bool:
+    """Schickt über die Proactive-Events-API eine Benachrichtigung (gelber Ring +
+    Signalton: "Neue Nachricht von Hausgeist"). Läuft im Recherche-Thread, exakt
+    bei Fertigstellung.
+
+    Mit user_id: gezielte Zustellung an das Konto des Auftraggebers (Unicast) —
+    zuverlässig und mandantenfähig. Ohne user_id (z.B. /chat-Test): Rundruf an
+    alle Skill-Nutzer (Multicast), den Amazon bei Dev-Skills aber oft verwirft.
+    """
     try:
         token_resp = requests.post(
             "https://api.amazon.com/auth/o2/token",
@@ -158,7 +168,11 @@ def send_notification() -> bool:
                     "messageGroup": {"creator": {"name": "Hausgeist"}, "count": 1},
                 },
             },
-            "relevantAudience": {"type": "Multicast", "payload": {}},
+            "relevantAudience": (
+                {"type": "Unicast", "payload": {"user": user_id}}
+                if user_id
+                else {"type": "Multicast", "payload": {}}
+            ),
         }
         resp = requests.post(
             "https://api.eu.amazonalexa.com/v1/proactiveEvents/stages/development",
