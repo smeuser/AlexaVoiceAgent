@@ -77,11 +77,22 @@ async def relay_endpoint(request: Request):
     # Skill-Lebenszyklus-Ereignisse (Skill aktiviert, Berechtigung erteilt/entzogen)
     # kommen über den events-Endpoint des Manifests — nur loggen und quittieren.
     try:
-        request_type = json.loads(body).get("request", {}).get("type", "")
+        skill_request = json.loads(body).get("request", {})
+        request_type = skill_request.get("type", "")
     except (ValueError, AttributeError):
-        request_type = ""
+        skill_request, request_type = {}, ""
     if request_type.startswith("AlexaSkillEvent."):
-        config.log(f"Skill-Ereignis empfangen: {request_type}")
+        detail = ""
+        event_body = skill_request.get("body") or {}
+        permissions = event_body.get("acceptedPermissions")
+        if permissions is not None:
+            scopes = ", ".join(p.get("scope", "?") for p in permissions) or "keine"
+            detail = f" — erteilte Berechtigungen: {scopes}"
+        subscriptions = event_body.get("subscriptions")
+        if subscriptions is not None:
+            names = ", ".join(s.get("eventName", "?") for s in subscriptions) or "keine"
+            detail += f" — aktive Abos: {names}"
+        config.log(f"Skill-Ereignis empfangen: {request_type}{detail}")
         return JSONResponse(content={})
 
     try:

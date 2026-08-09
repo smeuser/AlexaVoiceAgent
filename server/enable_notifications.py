@@ -31,6 +31,16 @@ SMAPI = "https://api.amazonalexa.com"
 PERMISSION = "alexa::devices:all:notifications:write"
 EVENT = "AMAZON.MessageAlert.Activated"
 
+# Verwaltungs-Ereignisse, über die Amazon den Skill informieren soll
+# (kommen als AlexaSkillEvent.* am /relay an und werden dort geloggt)
+SUBSCRIPTIONS = [
+    "SKILL_ENABLED",
+    "SKILL_DISABLED",
+    "SKILL_PERMISSION_ACCEPTED",
+    "SKILL_PERMISSION_CHANGED",
+    "SKILL_PROACTIVE_SUBSCRIPTION_CHANGED",
+]
+
 
 def get_access_token() -> str:
     if not ASK_CONFIG.exists():
@@ -81,6 +91,10 @@ def main() -> None:
                 "bitte melden, dann lösen wir das gemeinsam."
             )
         events["endpoint"] = custom_endpoint
+    subscriptions = events.setdefault("subscriptions", [])
+    for name in SUBSCRIPTIONS:
+        if not any(s.get("eventName") == name for s in subscriptions):
+            subscriptions.append({"eventName": name})
 
     print("Schreibe aktualisiertes Manifest ...")
     resp = requests.put(
