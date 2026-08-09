@@ -1,5 +1,7 @@
 """Alexa-Skill: Request-Handler und Signaturprüfung (Webservice statt AWS Lambda)."""
 
+import re
+
 from ask_sdk_core.dispatch_components import AbstractExceptionHandler, AbstractRequestHandler
 from ask_sdk_core.handler_input import HandlerInput
 from ask_sdk_core.skill_builder import SkillBuilder
@@ -7,9 +9,12 @@ from ask_sdk_core.utils import is_intent_name, is_request_type
 from ask_sdk_model import Response
 from ask_sdk_webservice_support.webservice_handler import WebserviceSkillHandler
 
-from . import agent, config
+from . import agent, config, research
 
 REPROMPT = "Was möchtest du noch wissen?"
+
+# Fragen, die mit diesen Wörtern beginnen, sind Recherche-Aufträge
+RESEARCH_TRIGGER = re.compile(r"^(?:recherchiere|recherchier|finde heraus)[,:]?\s*(.*)", re.IGNORECASE)
 
 
 def _get_history(handler_input: HandlerInput) -> list[dict]:
@@ -48,6 +53,27 @@ class ChatHandler(AbstractRequestHandler):
                 .ask(REPROMPT)
                 .response
             )
+
+        match = RESEARCH_TRIGGER.match(question.strip())
+        if match:
+            topic = match.group(1).strip() or question.strip()
+            research.start_research(topic)
+            system = handler_input.request_envelope.context.system
+            reminder_ok = False
+            try:
+                reminder_ok = research.create_reminder(
+                    system.api_endpoint,
+                    system.api_access_token,
+                    f"Die Recherche zu {topic} ist fertig. Frag mich, was ich herausgefunden habe.",
+                )
+            except Exception as exc:
+                print(f"Erinnerung konnte nicht angelegt werden: {exc!r}")
+            if reminder_ok:
+                speech = f"Ich recherchiere zu: {topic}. In fünf Minuten erinnere ich dich, dann liegen die Ergebnisse bereit."
+            else:
+                speech = f"Ich recherchiere zu: {topic}. Frag mich in ein paar Minuten, was ich herausgefunden habe."
+            return handler_input.response_builder.speak(speech).ask(REPROMPT).response
+
         spoken, history = agent.answer(question, _get_history(handler_input))
         _set_history(handler_input, history)
         return handler_input.response_builder.speak(spoken).ask(REPROMPT).response

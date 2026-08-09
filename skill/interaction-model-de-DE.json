@@ -24,7 +24,11 @@
             "wo {frage}",
             "ob {frage}",
             "merke dir {frage}",
-            "notiere {frage}"
+            "notiere {frage}",
+            "recherchiere {frage}",
+            "recherchier {frage}",
+            "recherchiere zu {frage}",
+            "finde heraus {frage}"
           ]
         },
         { "name": "AMAZON.HelpIntent", "samples": [] },

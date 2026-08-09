@@ -193,6 +193,37 @@ taskkill /im python.exe /f
 - Alexa gibt dem Skill maximal ~8 Sekunden pro Antwort. Die `Timing:`-Zeilen in
   `server.log` zeigen, wie nah man am Limit ist.
 
+## Recherche-Aufträge
+
+Der Hausgeist kann im Web recherchieren — aber wegen Alexas 8-Sekunden-Limit nicht
+„live“, sondern als Auftrag im Hintergrund:
+
+1. **Beauftragen:** „Alexa, sage mein hausgeist, recherchiere das Tomatenfest in
+   Wiesbaden“ (oder im laufenden Gespräch einfach „recherchiere …“ / „finde heraus …“).
+2. Der Skill antwortet sofort und legt — falls die Berechtigung erteilt ist — eine
+   **Alexa-Erinnerung in 5 Minuten** an („Die Recherche ist fertig …“).
+3. Im Hintergrund: Websuche über DuckDuckGo (kein API-Schlüssel nötig), die besten
+   Treffer werden gelesen, das Sprachmodell fasst alles zusammen, und das Ergebnis
+   landet **mit Quellenangaben** als Notiz unter `Recherchen/` im Obsidian-Vault.
+4. **Abrufen:** „Alexa, frage mein hausgeist, was hast du zum Tomatenfest
+   herausgefunden“ — die normale Notiz-Suche findet die frische Recherche.
+
+**Einmalige Einrichtung der Erinnerungen** (sonst entfällt nur die Erinnerung, die
+Recherche selbst läuft trotzdem):
+
+1. Developer Console → Skill → **Build → Permissions** (im linken Menü unter TOOLS)
+   → **Reminders** aktivieren → speichern (bei Alexa-hosted danach einmal **Deploy**
+   im Code-Tab nicht nötig, aber das Modell muss nicht neu gebaut werden).
+2. Alexa-App auf dem Handy → Mehr → Skills und Spiele → Ihre Skills → Dev →
+   Hausgeist → **Einstellungen → Berechtigungen** → Erinnerungen erlauben.
+
+Testen ohne Alexa: `curl -X POST localhost:8000/chat ... -d "{\"frage\": \"recherchiere ...\"}"` —
+Fortschritt und Ergebnis stehen in `server.log`, die fertige Notiz im Vault.
+
+Hinweis: Während einer laufenden Recherche ist die Grafikkarte kurz mit der
+Zusammenfassung beschäftigt — eine gleichzeitige Alexa-Frage kann dann einmalig
+etwas länger dauern.
+
 ## Wie das Gedächtnis funktioniert
 
 - **Lesen:** Vor jeder Antwort durchsucht der Server deinen Vault (semantische Suche über

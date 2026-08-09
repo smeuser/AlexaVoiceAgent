@@ -11,7 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import agent, config, llm, memory
+from . import agent, config, llm, memory, research
 from .alexa import build_relay_handler, build_webservice_handler
 
 webservice_handler = build_webservice_handler()
@@ -79,7 +79,16 @@ class ChatRequest(BaseModel):
 async def chat_endpoint(req: ChatRequest):
     """Zum Testen ohne Alexa, z.B.:
     curl -X POST localhost:8000/chat -H "Content-Type: application/json" -d "{\"frage\": \"Hallo, wer bist du?\"}"
+    Auch Recherche-Aufträge funktionieren hier: "frage": "recherchiere ..."
     """
+    from .alexa import RESEARCH_TRIGGER
+
+    match = RESEARCH_TRIGGER.match(req.frage.strip())
+    if match:
+        topic = match.group(1).strip() or req.frage.strip()
+        research.start_research(topic)
+        return {"antwort": f"Recherche zu '{topic}' gestartet — Ergebnis landet im Vault unter Recherchen/."}
+
     spoken, history = await run_in_threadpool(agent.answer, req.frage, req.history)
     return {"antwort": spoken, "history": history}
 

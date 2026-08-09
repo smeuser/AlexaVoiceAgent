@@ -5,8 +5,12 @@ import requests
 from . import config
 
 
-def chat(messages: list[dict], timeout: float = 20.0) -> str:
-    """Schickt einen Chatverlauf an Ollama und gibt die Antwort als Text zurück."""
+def chat(messages: list[dict], timeout: float = 20.0, num_predict: int = 150) -> str:
+    """Schickt einen Chatverlauf an Ollama und gibt die Antwort als Text zurück.
+
+    num_predict ist bewusst klein voreingestellt (kurze Alexa-Antworten);
+    die Hintergrund-Recherche übergibt größere Werte.
+    """
     resp = requests.post(
         f"{config.OLLAMA_URL}/api/chat",
         json={
@@ -17,7 +21,7 @@ def chat(messages: list[dict], timeout: float = 20.0) -> str:
             # würde die 8-Sekunden-Frist von Alexa sofort reißen
             "keep_alive": -1,
             "options": {
-                "num_predict": 150,  # kurze Antworten erzwingen (Alexa liest vor)
+                "num_predict": num_predict,
                 "temperature": 0.6,
             },
         },
