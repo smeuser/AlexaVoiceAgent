@@ -140,43 +140,66 @@ Einrichtung:
 5. Testen wie gehabt. Ein `ALEXA_SKILL_ID`-Eintrag ist bei diesem Weg optional;
    die Absicherung übernimmt das Token.
 
-## 5. Autostart (empfohlen)
+## 5. Autostart als Windows-Dienste (empfohlen)
 
-Damit alles nach einem Neustart des PCs von selbst läuft:
+Ziel: PC bekommt Strom → alles läuft, **ohne dass sich jemand anmeldet**. Dafür laufen
+alle drei Bausteine als echte Windows-Dienste:
 
-- **cloudflared** läuft als Windows-Dienst (startet schon vor der Anmeldung).
-- **Ollama** startet sich selbst bei der Benutzer-Anmeldung (Autostart-App).
-- **Der FastAPI-Server** wird über eine kleine Skriptdatei im Autostart-Ordner
-  gestartet: `Win + R` → `shell:startup` → dort eine Datei `hausgeist.vbs` anlegen
-  (Vorlage: [skill/hausgeist.vbs.example](skill/hausgeist.vbs.example), Pfade anpassen):
+- **cloudflared** ist durch die Tunnel-Einrichtung bereits ein Dienst.
+- **Ollama** und der **FastAPI-Server** werden mit [NSSM](https://nssm.cc/download)
+  zu Diensten gemacht (eine einzelne `nssm.exe`, an einen dauerhaften Ort legen —
+  Windows startet die Dienste künftig *durch* diese Datei, sie darf nie verschoben
+  oder gelöscht werden).
 
-  ```vbs
-  Set sh = CreateObject("WScript.Shell")
-  sh.CurrentDirectory = "C:\Pfad\zum\Projekt"
-  sh.Run "cmd /c .venv\Scripts\python.exe -m uvicorn server.main:app --host 0.0.0.0 --port 8000 >> server.log 2>&1", 0, False
-  ```
+Vorbereitung: Das Tray-Ollama beenden (Lama-Symbol → Quit) und im Task-Manager unter
+**Autostart von Apps** deaktivieren — sonst kollidiert es mit dem Dienst. Ebenso einen
+evtl. manuell laufenden Server beenden (`taskkill /im python.exe /f`).
 
-  Der Server läuft damit unsichtbar; alle Ausgaben (Startmeldungen, Timing-Zeilen,
-  „Gemerkt: …“) landen in `server.log` im Projektordner. Test ohne Neustart:
-  Doppelklick auf die Datei, dann `curl http://localhost:8000/health`.
-
-**Bewährte Neustart-Routine** (z.B. nach `git pull` oder `.env`-Änderung):
+Dann in einer **Administrator**-Eingabeaufforderung (Pfade anpassen):
 
 ```bat
-taskkill /im python.exe /f
+nssm install Ollama "C:\Users\NAME\AppData\Local\Programs\Ollama\ollama.exe" serve
+nssm set Ollama AppEnvironmentExtra OLLAMA_MODELS=C:\Users\NAME\.ollama\models
+nssm start Ollama
+
+nssm install Hausgeist "C:\Pfad\zum\Projekt\.venv\Scripts\python.exe" "-m uvicorn server.main:app --host 0.0.0.0 --port 8000"
+nssm set Hausgeist AppDirectory "C:\Pfad\zum\Projekt"
+nssm set Hausgeist AppStdout "C:\Pfad\zum\Projekt\server.log"
+nssm set Hausgeist AppStderr "C:\Pfad\zum\Projekt\server.log"
+nssm set Hausgeist DependOnService Ollama
+nssm start Hausgeist
 ```
 
-…dann Doppelklick auf `hausgeist.vbs` und 1–2 Minuten Warmup abwarten.
+Wichtige Details:
 
-**Zwei Lehren aus der Praxis:**
+- `OLLAMA_MODELS` muss gesetzt werden, weil der Dienst unter dem Systemkonto läuft
+  und die Modelle sonst nicht findet.
+- Die Abhängigkeit (`DependOnService Ollama`) sorgt für die richtige Startreihenfolge.
+- Alle Server-Ausgaben (Startmeldungen, `Timing:`-Zeilen, „Gemerkt: …“) landen in
+  `server.log` im Projektordner.
+- **Nach einem Kaltstart braucht der Hausgeist 2–4 Minuten**, bis das Modell im
+  Grafikspeicher liegt und der Vault indexiert ist — solange antwortet die
+  Tunnel-Adresse mit „Bad Gateway“. Das ist normal und kein Fehler.
+- In den Energieoptionen den **Energiesparmodus auf „Nie“** stellen — Bildschirm aus
+  ist okay, Standby macht den Server unerreichbar.
 
+**Betriebsroutine** (nach `git pull` oder `.env`-Änderung):
+
+```bat
+nssm restart Hausgeist
+```
+
+Status und Steuerung gehen auch über die normale Diensteverwaltung (`services.msc`).
+
+**Lehren aus der Praxis** (gescheiterte Alternativen):
+
+- Die **Aufgabenplanung** war für den Serverstart nicht zuverlässig zum Laufen zu
+  bringen; eine VBS-Datei im Autostart-Ordner funktioniert
+  ([skill/hausgeist.vbs.example](skill/hausgeist.vbs.example)), startet aber erst
+  bei der Benutzer-Anmeldung — Dienste sind die robustere Lösung.
 - `pythonw.exe -m uvicorn …` beendet sich sofort wieder (uvicorns Logging verträgt
-  den konsolenlosen Modus nicht) — deshalb der Umweg über `cmd /c` mit verstecktem
-  Fenster und Logdatei. Auch die Aufgabenplanung war damit nicht zum Laufen zu bringen.
-- Der Hausgeist ist erst **nach der Benutzer-Anmeldung** erreichbar, nicht schon am
-  Anmeldebildschirm. Für echten Dauerbetrieb: automatische Anmeldung (`netplwiz`)
-  einrichten und in den Energieoptionen den **Energiesparmodus auf „Nie“** stellen
-  (Bildschirm aus ist okay — Standby macht den Server unerreichbar).
+  den konsolenlosen Modus nicht) — falls ohne NSSM gestartet wird, immer
+  `python.exe` mit Log-Umleitung verwenden.
 
 ## Bedienung am Echo
 
