@@ -16,7 +16,7 @@ from ddgs import DDGS
 
 from . import config, llm, memory
 
-RESEARCH_FOLDER = "Recherchen"
+RESEARCH_FOLDER = config.RESEARCH_FOLDER
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"

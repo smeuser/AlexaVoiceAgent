@@ -14,6 +14,7 @@ def log(message: str) -> None:
 
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "./vault"))
 MEMORY_FOLDER = os.getenv("MEMORY_FOLDER", "KI-Gedaechtnis")
+RESEARCH_FOLDER = "Recherchen"
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3.1:8b")

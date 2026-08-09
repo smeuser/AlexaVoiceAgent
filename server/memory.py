@@ -194,6 +194,25 @@ def remember(fact: str) -> None:
     config.log(f"Gemerkt: {fact.strip()}")
 
 
+def latest_research_note(max_chars: int = 3000) -> tuple[str, str] | None:
+    """(Pfad, Inhalt) der zuletzt geschriebenen Recherche-Notiz — oder None.
+
+    Die Vektorsuche kennt keine Aktualität; für Fragen wie "was hast du
+    recherchiert?" muss die neueste Notiz deshalb gezielt geholt werden.
+    """
+    folder = config.VAULT_PATH / config.RESEARCH_FOLDER
+    if not folder.is_dir():
+        return None
+    files = sorted(folder.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not files:
+        return None
+    try:
+        text = files[0].read_text(encoding="utf-8", errors="ignore")[:max_chars]
+    except OSError:
+        return None
+    return str(files[0].relative_to(config.VAULT_PATH)), text
+
+
 def extract_memories(reply: str) -> tuple[str, list[str]]:
     """Trennt [MERKEN: ...]-Zeilen von der vorzulesenden Antwort."""
     facts = re.findall(r"\[MERKEN:\s*(.+?)\]", reply, flags=re.IGNORECASE | re.DOTALL)

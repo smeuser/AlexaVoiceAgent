@@ -29,6 +29,14 @@ def answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
         f"[Notiz: {c['file']}]\n{c['text']}" for c in context_chunks
     ) or "(keine passenden Notizen gefunden)"
 
+    # Fragt jemand allgemein nach "der Recherche", ist die NEUESTE gemeint —
+    # die Ähnlichkeitssuche allein würde sonst eine beliebige alte treffen.
+    if re.search(r"recherch|herausgefunden", question, re.IGNORECASE):
+        latest = memory.latest_research_note()
+        if latest:
+            rel, text = latest
+            context = f"[Neueste Recherche: {rel}]\n{text}\n\n{context}"
+
     messages = (
         [{"role": "system", "content": f"{config.SYSTEM_PROMPT}\n\nNotiz-Auszüge:\n{context}"}]
         + history[-MAX_HISTORY_MESSAGES:]
