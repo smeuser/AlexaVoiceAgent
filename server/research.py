@@ -137,7 +137,12 @@ def send_notification() -> bool:
         )
         if token_resp.status_code != 200:
             # Amazons Antwort nennt den Grund (invalid_client vs. invalid_scope)
-            config.log(f"Token-Abruf fehlgeschlagen ({token_resp.status_code}): {token_resp.text[:300]}")
+            try:
+                err = token_resp.json()
+                detail = f"{err.get('error')} — {err.get('error_description')}"
+            except ValueError:
+                detail = token_resp.text[:300]
+            config.log(f"Token-Abruf fehlgeschlagen ({token_resp.status_code}): {detail}")
             return False
         token = token_resp.json()["access_token"]
 
