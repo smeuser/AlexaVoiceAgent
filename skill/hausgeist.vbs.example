@@ -1,0 +1,19 @@
+' Autostart-Datei für den Hausgeist-Server (Windows).
+'
+' Einrichtung:
+'   1. Die beiden Pfade unten an den eigenen Projektordner anpassen.
+'   2. Datei als "hausgeist.vbs" in den Autostart-Ordner legen:
+'      Win + R -> shell:startup
+'   3. Test ohne Neustart: Doppelklick auf die Datei, 1-2 Minuten Warmup abwarten,
+'      dann im cmd: curl http://localhost:8000/health
+'
+' Der Server läuft unsichtbar; alle Ausgaben landen in server.log im Projektordner.
+' Neustart-Routine (z.B. nach git pull):  taskkill /im python.exe /f  -> Doppelklick.
+'
+' Hinweis: NICHT auf pythonw.exe umstellen — uvicorn beendet sich damit sofort
+' (das Logging verträgt den konsolenlosen Modus nicht). Das versteckte
+' cmd-Fenster (Parameter 0 in sh.Run) leistet dasselbe.
+
+Set sh = CreateObject("WScript.Shell")
+sh.CurrentDirectory = "C:\Users\DEIN_NAME\workspace\AlexaVoiceAgent"
+sh.Run "cmd /c .venv\Scripts\python.exe -m uvicorn server.main:app --host 0.0.0.0 --port 8000 >> server.log 2>&1", 0, False

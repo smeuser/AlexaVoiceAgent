@@ -112,7 +112,10 @@ sollte `{"status":"ok"}` zeigen.
 Dann am Echo: **„Alexa, öffne mein gehirn“** – und losfragen. Innerhalb der Sitzung kannst du
 direkt weitersprechen; mit „Stopp“ beendest du sie.
 
-## Plan B: Alexa-hosted Skill als Vermittler (Relay)
+## Plan B: Alexa-hosted Skill als Vermittler (Relay) — **so läuft es bei uns**
+
+Dieser Weg ist bei uns produktiv im Einsatz, weil der direkte HTTPS-Endpoint-Weg aus
+Abschnitt 4 auf unserem Konto nie funktioniert hat (siehe unten).
 
 Falls Amazon selbst gehostete HTTPS-Endpoints auf deinem Konto nicht aufruft
 (bekanntes Kontoproblem, Symptom: „Ich kann den angeforderten Skill nicht erreichen“,
@@ -137,15 +140,58 @@ Einrichtung:
 5. Testen wie gehabt. Ein `ALEXA_SKILL_ID`-Eintrag ist bei diesem Weg optional;
    die Absicherung übernimmt das Token.
 
-## 5. Autostart (optional, empfohlen)
+## 5. Autostart (empfohlen)
 
 Damit alles nach einem Neustart des PCs von selbst läuft:
 
-- **Ollama** und **cloudflared** starten als Dienste automatisch.
-- Den FastAPI-Server über die **Aufgabenplanung** (Task Scheduler) starten:
-  Neue Aufgabe → Trigger „Bei Anmeldung“ → Aktion: Programm
-  `C:\Pfad\zum\Projekt\.venv\Scripts\uvicorn.exe` mit Argumenten
-  `server.main:app --host 0.0.0.0 --port 8000` und „Starten in“ = Projektordner.
+- **cloudflared** läuft als Windows-Dienst (startet schon vor der Anmeldung).
+- **Ollama** startet sich selbst bei der Benutzer-Anmeldung (Autostart-App).
+- **Der FastAPI-Server** wird über eine kleine Skriptdatei im Autostart-Ordner
+  gestartet: `Win + R` → `shell:startup` → dort eine Datei `hausgeist.vbs` anlegen
+  (Vorlage: [skill/hausgeist.vbs.example](skill/hausgeist.vbs.example), Pfade anpassen):
+
+  ```vbs
+  Set sh = CreateObject("WScript.Shell")
+  sh.CurrentDirectory = "C:\Pfad\zum\Projekt"
+  sh.Run "cmd /c .venv\Scripts\python.exe -m uvicorn server.main:app --host 0.0.0.0 --port 8000 >> server.log 2>&1", 0, False
+  ```
+
+  Der Server läuft damit unsichtbar; alle Ausgaben (Startmeldungen, Timing-Zeilen,
+  „Gemerkt: …“) landen in `server.log` im Projektordner. Test ohne Neustart:
+  Doppelklick auf die Datei, dann `curl http://localhost:8000/health`.
+
+**Bewährte Neustart-Routine** (z.B. nach `git pull` oder `.env`-Änderung):
+
+```bat
+taskkill /im python.exe /f
+```
+
+…dann Doppelklick auf `hausgeist.vbs` und 1–2 Minuten Warmup abwarten.
+
+**Zwei Lehren aus der Praxis:**
+
+- `pythonw.exe -m uvicorn …` beendet sich sofort wieder (uvicorns Logging verträgt
+  den konsolenlosen Modus nicht) — deshalb der Umweg über `cmd /c` mit verstecktem
+  Fenster und Logdatei. Auch die Aufgabenplanung war damit nicht zum Laufen zu bringen.
+- Der Hausgeist ist erst **nach der Benutzer-Anmeldung** erreichbar, nicht schon am
+  Anmeldebildschirm. Für echten Dauerbetrieb: automatische Anmeldung (`netplwiz`)
+  einrichten und in den Energieoptionen den **Energiesparmodus auf „Nie“** stellen
+  (Bildschirm aus ist okay — Standby macht den Server unerreichbar).
+
+## Bedienung am Echo
+
+- **Gespräch starten:** „Alexa, öffne mein hausgeist“ → Begrüßung → frei weiterfragen,
+  solange der blaue Ring leuchtet (ohne „Alexa“ davor). Beenden mit „Stopp“; nach
+  ~8 Sekunden Stille endet die Sitzung von selbst.
+- **Abkürzung:** „Alexa, frage mein hausgeist, was wir am Wochenende vorhatten“ —
+  Frage und Antwort in einem Rutsch, ohne Begrüßung.
+- **Merken:** „…merke dir, dass die Mülltonnen dienstags rauskommen.“
+- Sätze innerhalb der Sitzung sollten mit einem der trainierten Muster beginnen
+  (was/wie/wer/wann/warum/wo/ob/frage/sag mir/erzähl mir/ich möchte wissen/merke
+  dir/notiere) — normale Fragen erfüllen das automatisch. Passt ein Satz nicht,
+  bleibt die Sitzung trotzdem offen, einfach neu formulieren.
+- Alexa gibt dem Skill maximal ~8 Sekunden pro Antwort. Die `Timing:`-Zeilen in
+  `server.log` zeigen, wie nah man am Limit ist.
 
 ## Wie das Gedächtnis funktioniert
 
@@ -159,10 +205,21 @@ Damit alles nach einem Neustart des PCs von selbst läuft:
 
 ## Wenn etwas hakt
 
-- **Alexa sagt „…antwortet nicht“:** Meist ein Timeout. Prüfe, ob `/health` über die
-  Tunnel-Adresse erreichbar ist und ob die erste Antwort im `/chat`-Test unter ~6 Sekunden
-  liegt. Das Warmup beim Serverstart muss durchgelaufen sein.
-- **Signaturfehler im Server-Log:** Die Anfrage kam nicht von Amazon oder die Skill-ID in
-  der `.env` stimmt nicht mit der Konsole überein.
-- **Antworten sind langsam:** Kleineres Modell probieren (z.B. `llama3.2:3b`) oder prüfen,
-  ob Ollama wirklich die GPU nutzt (`ollama ps` zeigt „100% GPU“).
+- **Alexa sagt „…antwortet nicht“ / „da ist etwas schiefgegangen“:** Meist ein Timeout.
+  Prüfe, ob `/health` über die Tunnel-Adresse erreichbar ist und ob die Antwort im
+  `/chat`-Test unter ~6 Sekunden liegt. Das Warmup beim Serverstart muss durchgelaufen
+  sein („Bereit.“ in `server.log`). Die Meldung „Der Computer zu Hause antwortet gerade
+  nicht“ kommt vom Lambda-Vermittler (Server zu langsam/nicht erreichbar); „Entschuldigung,
+  da ist etwas schiefgegangen…“ kommt vom Server selbst (Fehler steht dann im Log).
+- **`No module named uvicorn`:** Die Pakete sind nicht in der Projekt-venv installiert —
+  `.venv\Scripts\python.exe -m pip install -r requirements.txt` (der Server muss mit
+  genau der venv laufen, die in der Autostart-Datei steht).
+- **Antworten sind langsam:** In `server.log` die `Timing:`- und `Suche-Detail:`-Zeilen
+  ansehen. `ollama ps` muss das Chat-Modell mit „100% GPU“ zeigen und das Embedding-Modell
+  auf CPU. Notfalls kleineres Modell (`llama3.2:3b` in der `.env`).
+- **Folgeanfragen plötzlich langsamer als die erste:** Das Modell merkt sich vermutlich
+  bei jeder Antwort denselben Fakt neu (sichtbar an `Gemerkt:`-Zeilen im Log und Duplikaten
+  in `KI-Gedaechtnis/`) — Duplikate im Vault löschen; der System-Prompt verbietet das zwar,
+  kleine Modelle ignorieren es aber gelegentlich.
+- **QuickEdit-Falle:** Bei manuell gestartetem Server friert ein Klick ins cmd-Fenster den
+  Prozess ein, bis Enter/Esc gedrückt wird (Symptom: alle Anfragen timen aus).
