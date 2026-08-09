@@ -20,6 +20,8 @@ _lock = threading.Lock()
 # In-Memory-Index: Liste von {"file", "mtime", "text", "vector"}
 _chunks: list[dict] = []
 _matrix: np.ndarray | None = None  # normalisierte Vektoren, eine Zeile pro Chunk
+_cache: dict | None = None  # {relpath: {"mtime": float, "chunks": [...]}}, Spiegel der Cache-Datei
+_built = False  # wurde der In-Memory-Index schon einmal aufgebaut?
 
 
 def _split_into_chunks(text: str, max_len: int = 800) -> list[str]:
@@ -48,21 +50,27 @@ def _load_cache() -> dict:
 
 
 def refresh_index() -> None:
-    """Gleicht den Index mit dem Vault ab; nur neue/geänderte Dateien werden neu eingebettet."""
-    global _chunks, _matrix
+    """Gleicht den Index mit dem Vault ab; nur neue/geänderte Dateien werden neu eingebettet.
+
+    Ohne Änderungen im Vault kostet der Aufruf nur ein paar Datei-Stats (Millisekunden) —
+    Cache-Datei und Vektor-Matrix werden nur bei tatsächlichen Änderungen angefasst.
+    """
+    global _cache, _chunks, _matrix, _built
     with _lock:
-        cache = _load_cache()  # {relpath: {"mtime": float, "chunks": [{"text","vector"}]}}
-        new_cache: dict = {}
+        if _cache is None:
+            _cache = _load_cache()  # einmalig beim Start von der Platte
 
         if not config.VAULT_PATH.is_dir():
             print(f"Warnung: Vault-Pfad nicht gefunden: {config.VAULT_PATH}")
-            _chunks, _matrix = [], None
+            _cache, _chunks, _matrix, _built = {}, [], None, True
             return
 
+        new_cache: dict = {}
+        changed = False
         for path in sorted(config.VAULT_PATH.rglob("*.md")):
             rel = str(path.relative_to(config.VAULT_PATH))
             mtime = path.stat().st_mtime
-            cached = cache.get(rel)
+            cached = _cache.get(rel)
             if cached and cached["mtime"] == mtime:
                 new_cache[rel] = cached
                 continue
@@ -76,13 +84,20 @@ def refresh_index() -> None:
                 "mtime": mtime,
                 "chunks": [{"text": t, "vector": v} for t, v in zip(texts, vectors)],
             }
+            changed = True
             print(f"Indexiert: {rel} ({len(texts)} Abschnitte)")
 
-        _INDEX_FILE.write_text(json.dumps(new_cache), encoding="utf-8")
+        if len(new_cache) != len(_cache):
+            changed = True  # Dateien wurden gelöscht
 
+        _cache = new_cache
+        if not changed and _built:
+            return
+
+        _INDEX_FILE.write_text(json.dumps(_cache), encoding="utf-8")
         _chunks = [
             {"file": rel, "text": c["text"], "vector": c["vector"]}
-            for rel, entry in new_cache.items()
+            for rel, entry in _cache.items()
             for c in entry["chunks"]
         ]
         if _chunks:
@@ -92,6 +107,7 @@ def refresh_index() -> None:
             _matrix = m / norms
         else:
             _matrix = None
+        _built = True
 
 
 def search(query: str, k: int = 4) -> list[dict]:
