@@ -18,6 +18,13 @@ REPROMPT = "Was möchtest du noch wissen?"
 # das Wort "recherchiere" käme im Slot-Text nie an.)
 RESEARCH_TRIGGER = re.compile(r"^(?:recherchiere|recherchier|finde heraus)[,:]?\s*(.*)", re.IGNORECASE)
 
+# Sicherheitsnetz: Landet eine Neuigkeiten-Frage doch im allgemeinen ChatIntent
+# (Alexa routet kurze Sätze gern in "was {frage}"), erkennen wir sie am Wortlaut.
+NEWS_TRIGGER = re.compile(
+    r"^(?:was\s+)?(?:gibt\s+es|gibt's|hast\s+du)?\s*(?:etwas|was)?\s*(?:neues|neuigkeiten)\s*$",
+    re.IGNORECASE,
+)
+
 
 def _research_response(handler_input: HandlerInput, topic: str) -> Response:
     """Startet die Hintergrund-Recherche und antwortet sofort (inkl. Erinnerung, falls erlaubt)."""
@@ -93,6 +100,8 @@ class ChatHandler(AbstractRequestHandler):
         match = RESEARCH_TRIGGER.match(question.strip())
         if match:
             return _research_response(handler_input, match.group(1).strip() or question.strip())
+        if NEWS_TRIGGER.match(question.strip()):
+            return _neuigkeiten_response(handler_input)
 
         spoken, history = agent.answer(question, _get_history(handler_input))
         _set_history(handler_input, history)
@@ -130,29 +139,39 @@ class HelpHandler(AbstractRequestHandler):
         )
 
 
+def _neuigkeiten_response(handler_input: HandlerInput) -> Response:
+    """Liest die jüngste Recherche vor, ohne Umweg über die Ähnlichkeitssuche."""
+    latest = memory.latest_research_note()
+    if not latest:
+        return (
+            handler_input.response_builder
+            .speak("Ich habe gerade keine neuen Rechercheergebnisse für dich.")
+            .ask(REPROMPT)
+            .response
+        )
+    rel, text = latest
+    body = text.split("## Quellen")[0]
+    lines = [
+        line for line in body.splitlines()
+        if line.strip() and not line.startswith("Recherchiert am")
+    ]
+    # Die Titelzeile "# Recherche: <thema>" wird zur gesprochenen Einleitung
+    intro = ""
+    if lines and lines[0].startswith("#"):
+        topic = lines.pop(0).lstrip("# ").replace("Recherche:", "").strip()
+        intro = f"Meine Recherche zu {topic}: "
+    spoken = agent._sanitize_for_speech(intro + " ".join(lines))[:1200] or "Die letzte Recherche war leider ergebnislos."
+    return handler_input.response_builder.speak(spoken).ask(REPROMPT).response
+
+
 class NeuigkeitenHandler(AbstractRequestHandler):
-    """'Was gibt es Neues?' — liest die jüngste Recherche vor, ohne Umweg über die Suche."""
+    """'Was gibt es Neues?' — eigener Intent für die jüngste Recherche."""
 
     def can_handle(self, handler_input: HandlerInput) -> bool:
         return is_intent_name("NeuigkeitenIntent")(handler_input)
 
     def handle(self, handler_input: HandlerInput) -> Response:
-        latest = memory.latest_research_note()
-        if not latest:
-            return (
-                handler_input.response_builder
-                .speak("Ich habe gerade keine neuen Rechercheergebnisse für dich.")
-                .ask(REPROMPT)
-                .response
-            )
-        rel, text = latest
-        body = text.split("## Quellen")[0]
-        body = "\n".join(
-            line for line in body.splitlines()
-            if line.strip() and not line.startswith("#") and not line.startswith("Recherchiert am")
-        )
-        spoken = agent._sanitize_for_speech(body)[:1200] or "Die letzte Recherche war leider ergebnislos."
-        return handler_input.response_builder.speak(spoken).ask(REPROMPT).response
+        return _neuigkeiten_response(handler_input)
 
 
 class DankeHandler(AbstractRequestHandler):
