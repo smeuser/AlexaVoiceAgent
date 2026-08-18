@@ -89,6 +89,11 @@ Der Tunnel stellt sie bereit, ohne dass du Ports im Router öffnen musst.
 Test im Browser (auch vom Handy aus dem Mobilfunknetz): `https://alexa.deine-domain.de/health`
 sollte `{"status":"ok"}` zeigen.
 
+Welche Routen der Server nach außen anbietet, wer sie aufrufen darf und wie sie
+abgesichert sind, steht in der [Schnittstellen-Spezifikation](docs/tunnel-schnittstelle.md).
+Kurzfassung: Öffentlich wirksam sind nur `/health` und das token-geschützte `/relay`;
+der Test-Endpoint `/chat` ist ausschließlich aus dem Heimnetz erreichbar.
+
 ## 4. Alexa-Skill anlegen
 
 1. Auf [developer.amazon.com/alexa](https://developer.amazon.com/alexa/console/ask) mit

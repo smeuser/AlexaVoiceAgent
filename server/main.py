@@ -4,6 +4,7 @@ Start (im Projektordner):
     uvicorn server.main:app --host 0.0.0.0 --port 8000
 """
 
+import ipaddress
 import json
 import logging.config
 from contextlib import asynccontextmanager
@@ -110,12 +111,32 @@ class ChatRequest(BaseModel):
     history: list[dict] = []
 
 
+def _is_local_request(request: Request) -> bool:
+    """True nur für Anfragen aus dem Heimnetz — nicht über den Cloudflare Tunnel.
+
+    cloudflared verbindet sich zwar selbst von 127.0.0.1, setzt aber immer den
+    Header CF-Connecting-IP mit der echten Absenderadresse; daran erkennen wir
+    Tunnel-Anfragen. Alles andere muss aus einem privaten Adressbereich kommen.
+    """
+    if request.headers.get("cf-connecting-ip"):
+        return False
+    client = request.client.host if request.client else ""
+    try:
+        return ipaddress.ip_address(client).is_private or client in ("127.0.0.1", "::1")
+    except ValueError:
+        return False
+
+
 @app.post("/chat")
-async def chat_endpoint(req: ChatRequest):
-    """Zum Testen ohne Alexa, z.B.:
+async def chat_endpoint(req: ChatRequest, request: Request):
+    """Test-Endpoint ohne Alexa — nur aus dem Heimnetz erreichbar, z.B.:
     curl -X POST localhost:8000/chat -H "Content-Type: application/json" -d "{\"frage\": \"Hallo, wer bist du?\"}"
     Auch Recherche-Aufträge funktionieren hier: "frage": "recherchiere ..."
     """
+    if not _is_local_request(request):
+        config.log(f"/chat von außen abgelehnt ({request.headers.get('cf-connecting-ip', request.client.host if request.client else '?')})")
+        return JSONResponse(content={"error": "forbidden"}, status_code=403)
+
     from .alexa import RESEARCH_TRIGGER
 
     match = RESEARCH_TRIGGER.match(req.frage.strip())
